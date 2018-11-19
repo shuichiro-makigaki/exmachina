@@ -1,0 +1,17 @@
+biopython
+matplotlib
+pytest
+pytest-pep8
+pytest-cov
+scikit-learn
+scipy
+numpy<=1.14.5
+tqdm
+more_itertools
+jupyter
+jupyter_contrib_nbextensions
+jupyter-js-widgets-nbextension
+tensorflow
+keras
+seaborn
+ipyparallel
