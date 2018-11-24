@@ -15,7 +15,7 @@ from Bio.Blast.Applications import NcbipsiblastCommandline, NcbideltablastComman
 import numpy as np
 from tqdm import tqdm
 
-scop_root = Scop(dir_path=Path('data/scop'), version='1.75')
+# scop_root = Scop(dir_path=Path('data/scop'), version='1.75')
 
 test_data = {
     'd1wlqc_': (datetime(2009, 2, 17, 0, 0), 'a.4.5', 762),

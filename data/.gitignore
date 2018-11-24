@@ -1,0 +1,13 @@
+scop_e/*/*
+pssm/*/*
+prediction/*
+test/*
+train/*
+scop/*
+*.pkl
+*.fa
+*.fasta
+*.h5
+!.gitkeep
+!pssm/qg/d1qg3a1.mtx
+!pssm/va/d1va9a1.mtx
