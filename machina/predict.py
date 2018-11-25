@@ -215,3 +215,16 @@ def predict_by_nn(n_jobs, args):  # args = [(px1, px2), ...]
     args = more_itertools.chunked(args, int(len(args)/n_jobs))
     with ProcessPoolExecutor(max_workers=n_jobs) as executor:
         [_ for _ in list(executor.map(_predict_by_nn, args))]
+
+
+def predict_scores(query, template):
+    args = [(query, template)]
+    x = np.load('data/train/scop40_logscore_tmscore50_w5_randomsampling_ratio0.1_x.npy')
+    y = np.load('data/train/scop40_logscore_tmscore50_w5_randomsampling_ratio0.1_y.npy')
+    knn_index_name = 'flann19_scop40_logscore_tmscore50_w5_randomsampling_ratio0.1'
+    dim = 200
+    nn = 1000
+    predict_by_flann(x, y, dim, knn_index_name, nn, args)
+    logging.info('')
+    logging.info('Result is saved into:')
+    logging.info(f'data/prediction/{knn_index_name}_nn{nn}/{query}/{template}.npy')
