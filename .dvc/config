@@ -1,0 +1,4 @@
+['remote "tsubame"']
+url = ssh://16D38098@login.t3.gsic.titech.ac.jp:/gs/hs0/tga-ishidalab/makigaki/dvc-cache/machina/data
+[core]
+remote = tsubame
