@@ -110,3 +110,5 @@ venv.bak/
 /*.csv
 /others
 /data/
+
+/data

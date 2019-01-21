@@ -1,0 +1,5 @@
+md5: da98b443fc7e15cc4ff71d0be834fca9
+outs:
+- cache: true
+  md5: 6ccc38029b44812736fee187512f5626.dir
+  path: data
