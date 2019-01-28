@@ -4,8 +4,9 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 
 from Bio.SCOP import Scop
 from Bio import SeqIO
+from tqdm import tqdm
 
-from TMtoolsCommandLine import TMalignCommandLine
+from .TMtoolsCommandLine import TMalignCommandLine
 
 
 def run_tmalign_async(dom1, dom2):
@@ -18,13 +19,13 @@ def run_tmalign_async(dom1, dom2):
     return None
 
 
-def generate_structural_alignments(scop_dir: str, scop_version: str, pdb_dir: str, out_file: str):
-    scop40 = SeqIO.index('data/train/astral-scopdom-seqres-gd-sel-gs-bib-40-1.75.fa', 'fasta')
+def generate_structural_alignments(scop40_fasta: str, scop_dir: str, scop_version: str, pdb_dir: str, out_file: str):
+    scop40 = SeqIO.index(scop40_fasta, 'fasta')
     scop_root = Scop(dir_path=scop_dir, version=scop_version).getRoot()
     results = []
-    for cl in scop_root.getChildren():
-        for cf in cl.getChildren():
-            for sf in cf.getChildren():
+    for cl in tqdm(scop_root.getChildren()):
+        for cf in tqdm(cl.getChildren()):
+            for sf in tqdm(cf.getChildren()):
                 px = sf.getDescendents('px')
                 if len(px) < 2:
                     continue
