@@ -8,12 +8,28 @@ from Bio import SeqIO
 from Bio.Blast.Applications import NcbipsiblastCommandline
 from tqdm import tqdm
 
-from TMtoolsCommandLine import TMalignCommandLine
-
-logging.basicConfig(format='%(asctime)s [%(levelname)s] %(message)s', level=logging.INFO)
+from .TMtoolsCommandLine import TMalignCommandLine
 
 
-def generate_sequence_profiles():
+def generate_sequence_profiles(structural_alignment_path, pssm_dir, blastdb='uniref90'):
+    results = []
+    seq_index = SeqIO.index(structural_alignment_path, 'fasta')
+    for record_id in seq_index:
+        results.append(record_id.split('&')[0])
+        results.append(record_id.split('&')[1])
+
+    for domain in tqdm(set(results)):
+        if Path(f'{pssm_dir}/{domain[2:4]}/{domain}.mtx').exists():
+            continue
+        Path(f'{pssm_dir}/{domain[2:4]}').mkdir(parents=True, exist_ok=True)
+        seq_record = seq_index[[_ for _ in seq_index if _.startswith(f'{domain}&')][0]]
+        NcbipsiblastCommandline(db=blastdb, num_threads=os.cpu_count(), num_iterations=3,
+                                out_ascii_pssm=Path(f'{pssm_dir}/{domain[2:4]}/{domain}.mtx').as_posix(),
+                                save_pssm_after_last_round=True
+                                )(stdin=str(seq_record.seq))
+
+
+def __generate_sequence_profiles_old():
     mtx_dir_name = 'pssm_deltablast'
     DB_INDEX = SeqIO.index('data/scop40_structural_alignment.fasta', 'fasta')
     records = {}
@@ -66,7 +82,3 @@ def generate_sequence_profiles():
         finally:
             if Path(f'{sid}.fasta').exists():
                 Path(f'{sid}.fasta').unlink()
-
-
-if __name__ == '__main__':
-    main()
