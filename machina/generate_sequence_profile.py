@@ -13,7 +13,7 @@ from TMtoolsCommandLine import TMalignCommandLine
 logging.basicConfig(format='%(asctime)s [%(levelname)s] %(message)s', level=logging.INFO)
 
 
-def main():
+def generate_sequence_profiles():
     mtx_dir_name = 'pssm_deltablast'
     DB_INDEX = SeqIO.index('data/scop40_structural_alignment.fasta', 'fasta')
     records = {}
