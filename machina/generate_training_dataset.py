@@ -5,9 +5,11 @@ import itertools
 import csv
 import pickle
 from multiprocessing import Pool
+from concurrent.futures import ProcessPoolExecutor, as_completed
 import multiprocessing
 import shutil
 import os
+import random
 
 from Bio import SeqIO
 from Bio.Alphabet import generic_protein
@@ -25,7 +27,7 @@ AA = ['A', 'R', 'N', 'D', 'C', 'Q', 'E', 'G', 'H', 'I',
       'L', 'K', 'M', 'F', 'P', 'S', 'T', 'W', 'Y', 'V']
 # ToDo: Assert AA order in original PSSM file
 TMSCORE_THRESHOLD = 0.5
-WINDOW_WIDTH = 9
+WINDOW_WIDTH = 5
 WINDOW_CENTER = int(WINDOW_WIDTH / 2)
 USE_PADDING_LABEL = False
 PART_DIR = 'data/train/process_part'
@@ -174,7 +176,7 @@ def process(*args):
                         writer.writerow(list(v[0].reshape(WINDOW_WIDTH*20*2))+list([v[1]]))
 
 
-def create_scop40_dataset(window_size, tmscore_threshold, n_jobs=None):
+def create_scop40_dataset_old(window_size, tmscore_threshold, n_jobs=None):
     global WINDOW_WIDTH
     global WINDOW_CENTER
     global TMSCORE_THRESHOLD
@@ -197,6 +199,46 @@ def create_scop40_dataset(window_size, tmscore_threshold, n_jobs=None):
                          more_itertools.chunked(
                              itertools.combinations(hie[px], 2),
                              n_jobs))
+
+
+def process2(msa: MultipleSeqAlignment, pssm1: PSSM, pssm2: PSSM, ratio: float):
+    assert len(pssm1.pssm) == len(msa[0].seq.ungap('-'))
+    assert len(pssm2.pssm) == len(msa[1].seq.ungap('-'))
+    recs, _ = create_dataset(pssm1, pssm2, msa)
+    results = []
+    for r in recs:
+        for x, y in itertools.product(range(WINDOW_WIDTH), range(WINDOW_WIDTH)):
+            v = r[x][y]
+            if v:
+                if random.random() <= ratio:
+                    results.append(list(v[0].reshape(WINDOW_WIDTH*len(AA)*2))+list([v[1]]))
+    return results
+
+
+def create_scop40_dataset(structural_alignments_path: str, pssm_dir: str,
+                          out_path: str, ratio: float, masked_ids: list):
+    aligns = SeqIO.index(structural_alignments_path, 'fasta')
+    finished = []
+    with ProcessPoolExecutor() as executor:
+        futures = []
+        for seq_id in tqdm(aligns):
+            if float(aligns[seq_id].description.split('=')[1]) < TMSCORE_THRESHOLD:
+                continue
+            dom1, dom2 = seq_id.split('&')[:2]
+            if dom1 in masked_ids or dom2 in masked_ids:
+                continue
+            if (dom1, dom2) in finished:
+                continue
+            futures.append(
+                executor.submit(process2,
+                                MultipleSeqAlignment([aligns[f'{dom1}&{dom2}'], aligns[f'{dom2}&{dom1}']]),
+                                parse_pssm(f'{pssm_dir}/{dom1[2:4]}/{dom1}.mtx'),
+                                parse_pssm(f'{pssm_dir}/{dom2[2:4]}/{dom2}.mtx'),
+                                ratio))
+            finished.append((dom1, dom2))
+            finished.append((dom2, dom1))
+        np.save(out_path,
+                np.array([_.result() for _ in tqdm(as_completed(futures), total=len(futures))], dtype=np.int8))
 
 
 def get_training_data(sid1, sid2, window_size, tmscore_threshold):
