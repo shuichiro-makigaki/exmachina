@@ -212,7 +212,7 @@ def process2(msa: MultipleSeqAlignment, pssm1: PSSM, pssm2: PSSM, ratio: float):
             if v:
                 if random.random() <= ratio:
                     results.append(list(v[0].reshape(WINDOW_WIDTH*len(AA)*2))+list([v[1]]))
-    return results
+    return np.array(results, dtype=np.int8)
 
 
 def create_scop40_dataset(structural_alignments_path: str, pssm_dir: str,
@@ -237,8 +237,12 @@ def create_scop40_dataset(structural_alignments_path: str, pssm_dir: str,
                                 ratio))
             finished.append((dom1, dom2))
             finished.append((dom2, dom1))
-        np.save(out_path,
-                np.array([_.result() for _ in tqdm(as_completed(futures), total=len(futures))], dtype=np.int8))
+        results = []
+        for future in as_completed(futures):
+            results.extend(future.result())
+        results = np.array(results, dtype=np.int8)
+        np.save(out_path, results)
+        logging.info(f'Training data shape={results.shape}')
 
 
 def get_training_data(sid1, sid2, window_size, tmscore_threshold):
