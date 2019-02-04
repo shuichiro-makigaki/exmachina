@@ -258,11 +258,12 @@ def split_data_label(sample_path: str, out_x_path: str, out_y_path: str):
     np.save(out_y_path, y)
 
 
-def get_validation_label(sid1, sid2):
-    pssm1 = parse_pssm(f'data/pssm/{sid1[2:4]}/{sid1}.mtx')
-    pssm2 = parse_pssm(f'data/pssm/{sid2[2:4]}/{sid2}.mtx')
-    msa = MultipleSeqAlignment([db_index[f'{id1}&{id2}'], db_index[f'{id2}&{id1}']])
-    assert len(pssm1.pssm) == msa[0] and len(pssm2.pssm) == msa[1]
+def get_validation_label(domain_sid1: str, domain_sid2: str, structural_alignments_path: str, pssm_dir: str):
+    pssm1 = parse_pssm(f'{pssm_dir}/{domain_sid1[2:4]}/{domain_sid1}.mtx')
+    pssm2 = parse_pssm(f'{pssm_dir}/{domain_sid2[2:4]}/{domain_sid2}.mtx')
+    aligns = SeqIO.index(structural_alignments_path, 'fasta')
+    msa = MultipleSeqAlignment([aligns[f'{domain_sid1}&{domain_sid2}'], aligns[f'{domain_sid2}&{domain_sid2}']])
+    assert len(pssm1.pssm) == len(msa[0]) and len(pssm2.pssm) == len(msa[1])
     Y = np.zeros((len(pssm1.pssm), len(pssm2.pssm)), dtype=np.int8)
     x, y = 0, 0
     for i in range(msa.get_alignment_length()):
