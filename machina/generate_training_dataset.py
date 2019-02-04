@@ -258,45 +258,11 @@ def split_data_label(sample_path: str, out_x_path: str, out_y_path: str):
     np.save(out_y_path, y)
 
 
-def get_training_data(sid1, sid2, window_size, tmscore_threshold):
-    global WINDOW_WIDTH
-    global WINDOW_CENTER
-    global TMSCORE_THRESHOLD
-    WINDOW_WIDTH = window_size
-    TMSCORE_THRESHOLD = tmscore_threshold
-    WINDOW_CENTER = int(WINDOW_WIDTH / 2)
-    tmalign = TMalignCommandLine(f'data/scop_e/{sid1[2:4]}/{sid1}.ent', f'data/scop_e/{sid2[2:4]}/{sid2}.ent')
-    tmalign.run()
-    if max(tmalign.tmscore) < TMSCORE_THRESHOLD:
-        return None, None
+def get_validation_label(sid1, sid2):
     pssm1 = parse_pssm(f'data/pssm/{sid1[2:4]}/{sid1}.mtx')
     pssm2 = parse_pssm(f'data/pssm/{sid2[2:4]}/{sid2}.mtx')
-    msa = parse_alignment(sid1, sid2)
-    recs, _ = create_dataset(pssm1, pssm2, msa)
-    X, Y = [], []
-    for r in recs:
-        for x, y in itertools.product(range(WINDOW_WIDTH), range(WINDOW_WIDTH)):
-            v = r[x][y]
-            if v:
-                X.append(list(v[0].reshape(WINDOW_WIDTH*20*2)))
-                Y.append([int(v[1])])
-    return np.array(X, dtype=np.int8), np.array(Y, dtype=np.int8)
-
-
-def get_validation_data(sid1, sid2, db_index, window_size, tmscore_threshold):
-    global WINDOW_WIDTH
-    global WINDOW_CENTER
-    global TMSCORE_THRESHOLD
-    WINDOW_WIDTH = window_size
-    TMSCORE_THRESHOLD = tmscore_threshold
-    WINDOW_CENTER = int(WINDOW_WIDTH / 2)
-    tmalign = TMalignCommandLine(f'data/scop_e/{sid1[2:4]}/{sid1}.ent', f'data/scop_e/{sid2[2:4]}/{sid2}.ent')
-    tmalign.run()
-    if max(tmalign.tmscore) < TMSCORE_THRESHOLD:
-        return None, None
-    pssm1 = parse_pssm(f'data/pssm/{sid1[2:4]}/{sid1}.mtx')
-    pssm2 = parse_pssm(f'data/pssm/{sid2[2:4]}/{sid2}.mtx')
-    msa = parse_alignment(sid1, sid2, db_index)
+    msa = MultipleSeqAlignment([db_index[f'{id1}&{id2}'], db_index[f'{id2}&{id1}']])
+    assert len(pssm1.pssm) == msa[0] and len(pssm2.pssm) == msa[1]
     Y = np.zeros((len(pssm1.pssm), len(pssm2.pssm)), dtype=np.int8)
     x, y = 0, 0
     for i in range(msa.get_alignment_length()):
@@ -308,10 +274,5 @@ def get_validation_data(sid1, sid2, db_index, window_size, tmscore_threshold):
             Y[x, y] = 1
             x += 1
             y += 1
-    X = np.empty((len(pssm1.pssm)*len(pssm2.pssm), WINDOW_WIDTH*20*2), dtype=np.int8)
-    i = 0
-    for x1, x2 in itertools.product(range(len(pssm1.pssm)), range(len(pssm2.pssm))):
-        vec1, vec2 = get_feature_vector(pssm1, pssm2, x1, x2)
-        X[i, :] = np.array(list(vec1) + list(vec2), dtype=np.int8)
-        i += 1
-    return X, Y
+    
+    return Y
