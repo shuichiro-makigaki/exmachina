@@ -20,7 +20,7 @@ logging.basicConfig(format='%(asctime)s [%(levelname)s] %(message)s', level=logg
 AA = ['A', 'R', 'N', 'D', 'C', 'Q', 'E', 'G', 'H', 'I',
       'L', 'K', 'M', 'F', 'P', 'S', 'T', 'W', 'Y', 'V']
 # ToDo: Assert AA order in original PSSM file
-WINDOW_WIDTH = 9
+WINDOW_WIDTH = 5
 WINDOW_CENTER = int(WINDOW_WIDTH / 2)
 USE_PADDING_LABEL = False
 # MODEL_NAME = 'NN_scop40_tmscore50_w9_downsampling_ep20_ba512'
@@ -127,7 +127,7 @@ def predict_by_kmknc(x, y, dim, model_name, args):  # args = [(px1, px2), ...]
         np.save(fname, proba)
 
 
-def predict_by_flann(x, y, dim, model_name, num_neighbors, args):  # args = [(px1, px2), ...]
+def predict_by_flann_old(x, y, dim, model_name, num_neighbors, args):  # args = [(px1, px2), ...]
     global WINDOW_WIDTH
     global WINDOW_CENTER
     WINDOW_WIDTH = 5
@@ -147,6 +147,27 @@ def predict_by_flann(x, y, dim, model_name, num_neighbors, args):  # args = [(px
         samples = _get_test_vector_set(pssm1, pssm2, dim).astype(np.int32)
         result, _ = model.nn_index(samples, num_neighbors=num_neighbors)
         proba = np.array([np.count_nonzero(y[_])/num_neighbors for _ in result]).reshape((len(pssm1.pssm), len(pssm2.pssm)))
+        np.save(fname, proba)
+
+
+def predict_by_flann(x_path: str, y_path: str, model_path: str, num_neighbors: int, out_dir: str, pssm_dir: str, args):
+    x = np.load(x_path).astype(np.int32)
+    y = np.load(y_path)
+    model = pyflann.FLANN()
+    model.load_index(model_path, x)
+    for a in tqdm(args):
+        query, template = a[0], a[1]
+        out_query_dir = Path(out_dir)/query
+        fname = out_query_dir/f'{template}.npy'
+        if fname.exists():
+            continue
+        out_query_dir.mkdir(exist_ok=True, parents=True)
+        pssm1 = parse_pssm(f'{pssm_dir}/{query[2:4]}/{query}.mtx')
+        pssm2 = parse_pssm(f'{pssm_dir}/{template[2:4]}/{template}.mtx')
+        samples = _get_test_vector_set(pssm1, pssm2, x.shape[1]).astype(np.int32)
+        result, _ = model.nn_index(samples, num_neighbors=num_neighbors)
+        proba = np.array(
+            [np.count_nonzero(y[_])/num_neighbors for _ in result]).reshape((len(pssm1.pssm), len(pssm2.pssm)))
         np.save(fname, proba)
 
 

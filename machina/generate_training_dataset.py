@@ -245,6 +245,19 @@ def create_scop40_dataset(structural_alignments_path: str, pssm_dir: str,
         logging.info(f'Training data shape={results.shape}')
 
 
+def split_data_label(sample_path: str, out_x_path: str, out_y_path: str):
+    samples = np.load(sample_path)
+    i = 0
+    x = np.empty((samples.shape[0], samples.shape[1]-1), dtype=np.int8)
+    y = np.empty(samples.shape[0], dtype=np.int8)
+    for v in tqdm(samples):
+        x[i, :] = v[:-1]
+        y[i] = v[-1]
+        i += 1
+    np.save(out_x_path, x)
+    np.save(out_y_path, y)
+
+
 def get_training_data(sid1, sid2, window_size, tmscore_threshold):
     global WINDOW_WIDTH
     global WINDOW_CENTER
