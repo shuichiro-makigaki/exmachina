@@ -7,7 +7,6 @@ from Bio import SeqIO, Align
 from Bio.Seq import Seq
 from Bio.SeqRecord import SeqRecord
 from Bio.Alphabet import generic_protein
-from Bio.SCOP import Scop
 from Bio import SearchIO
 from Bio.SubsMat import MatrixInfo
 from Bio import pairwise2
@@ -15,7 +14,6 @@ from Bio.Blast.Applications import NcbipsiblastCommandline, NcbideltablastComman
 import numpy as np
 from tqdm import tqdm
 
-# scop_root = Scop(dir_path=Path('data/scop'), version='1.75')
 
 test_data = {
     'd1wlqc_': (datetime(2009, 2, 17, 0, 0), 'a.4.5', 762),
@@ -95,24 +93,19 @@ class MachinaModel:
                    pir_file, template, query, f'data/scop_e/{template[2:4]}']
             subprocess.run(arg, stdout=subprocess.PIPE, stderr=subprocess.PIPE, universal_newlines=True)
 
-    def generate_protein_model(self, query, template, alignments_list, out_dir):
-        if Path(f'{out_dir}/{template}.pdb').exists():
-            return
-        if not Path(f'data/scop_e/{template[2:4]}/{template}.ent').exists():
-            return
-        best = self._get_best_aln(alignments_list, template)
-        if best is None:
-            return
+    def generate_protein_model(self, query: str, template: str, alignments_list: str, out_dir: str, template_dir: str):
+        aln = np.load(alignments_list)
+        best = aln[np.argmax([_[2] for _ in aln])]
         pir_file = f'{out_dir}/{template}.pir'
-        tseq = replace_missing_residues(best[1], f'data/scop_e/{template[2:4]}/{template}.ent')
+        tseq = replace_missing_residues(best[1], f'{template_dir}/{template}.ent')
         Path(out_dir).mkdir(parents=True, exist_ok=True)
         SeqIO.write([
             SeqRecord(Seq(best[0], generic_protein), id=query, name='', description=f'sequence:{query}::::::::'),
             SeqRecord(Seq(tseq, generic_protein), id=template, name='',
                       description=f'structureX:{template}::{template[5].upper()}::{template[5].upper()}::::')
         ], pir_file, 'pir')
-        arg = ['/opt/modeller-9.20/bin/modpy.sh', 'python3', 'machina/modeller_script.py',
-               pir_file, template, query, f'data/scop_e/{template[2:4]}']
+        arg = ['/opt/modeller-9.20/bin/modpy.sh', 'python3', Path(__file__).parent.resolve()/'modeller_script.py',
+               pir_file, template, query, template_dir]
         subprocess.run(arg, stdout=subprocess.PIPE, stderr=subprocess.PIPE, universal_newlines=True)
 
 
