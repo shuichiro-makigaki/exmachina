@@ -1,5 +1,5 @@
-from datetime import datetime
 from pathlib import Path
+import os
 import subprocess
 import random
 
@@ -13,24 +13,6 @@ from Bio import pairwise2
 from Bio.Blast.Applications import NcbipsiblastCommandline, NcbideltablastCommandline
 import numpy as np
 from tqdm import tqdm
-
-
-test_data = {
-    'd1wlqc_': (datetime(2009, 2, 17, 0, 0), 'a.4.5', 762),
-    'd2axtu1': (datetime(2009, 2, 10, 0, 0), 'a.60.12', 159),
-    'd2zqna1': (datetime(2009, 2, 10, 0, 0), 'b.42.2', 119),
-    'd1qg3a1': (datetime(2009, 1, 20, 0, 0), 'b.1.2', 344),
-    'd1wzca1': (datetime(2009, 1, 27, 0, 0), 'c.108.1', 296),
-    'd2dsta1': (datetime(2009, 1, 27, 0, 0), 'c.69.1', 975),
-    'd1y5ha3': (datetime(2009, 2, 10, 0, 0), 'd.37.1', 62),
-    'd2pzza1': (datetime(2009, 1, 20, 0, 0), 'd.77.1', 92),
-    'd1ni9a_': (datetime(2009, 2, 10, 0, 0), 'e.7.1', 151),
-    'd3cw9a1': (datetime(2008, 9, 2, 0, 0), 'e.23.1', 22),
-    'd2axtd1': (datetime(2009, 2, 10, 0, 0), 'f.26.1', 174),
-    'd2axto1': (datetime(2009, 2, 10, 0, 0), 'f.4.1', 15),
-    'd2vy4a1': (datetime(2009, 2, 17, 0, 0), 'g.37.1', 182),
-    'd3d9ta1': (datetime(2009, 2, 10, 0, 0), 'g.52.1', 81)
-}
 
 
 # ToDo: Support PDB chains
@@ -57,14 +39,8 @@ def replace_missing_residues(template_alignment, pdb):
 
 
 class MachinaModel:
-    def _get_best_aln(self, machina_result, template_sid):
-        keys = [list(x.keys())[0] for x in machina_result]
-        if template_sid not in keys:
-            return None
-        result = machina_result[keys.index(template_sid)][template_sid]
-        return result[np.argmax([x[2] for x in result])]
-
-    def _get_top_aln(self, search_result, n_top):
+    @staticmethod
+    def _get_top_aln(search_result, n_top):
         result_d = {}
         for r in np.load(search_result):
             key = list(r.keys())[0]
@@ -72,9 +48,10 @@ class MachinaModel:
             result_d[key] = r[key][bst]
         return sorted(result_d.items(), key=lambda x: x[1][2], reverse=True)[:n_top]
 
-    def generate_protein_models_from_search(self, search_result, query, out_dir, n_top=10):
+    @classmethod
+    def generate_protein_models_from_search(cls, search_result, query, out_dir, n_top=10):
         Path(out_dir).mkdir(parents=True, exist_ok=True)
-        for r in self._get_top_aln(search_result, n_top):
+        for r in cls._get_top_aln(search_result, n_top):
             template = r[0]
             if Path(f'{out_dir}/{template}.pdb').exists():
                 continue
@@ -93,7 +70,8 @@ class MachinaModel:
                    pir_file, template, query, f'data/scop_e/{template[2:4]}']
             subprocess.run(arg, stdout=subprocess.PIPE, stderr=subprocess.PIPE, universal_newlines=True)
 
-    def generate_protein_model(self, query: str, template: str, alignments_list: str, out_dir: str, template_dir: str):
+    @staticmethod
+    def generate_protein_model(query: str, template: str, alignments_list: str, out_dir: str, template_dir: str):
         aln = np.load(alignments_list)
         best = aln[np.argmax([_[2] for _ in aln])]
         pir_file = f'{out_dir}/{template}.pir'
@@ -110,8 +88,9 @@ class MachinaModel:
 
 
 class BLASTModel:
-    def __init__(self, algo):
+    def __init__(self, algo, blast_db_dir):
         self.algo = algo
+        self.blast_db_dir = blast_db_dir
 
     def generate_search_result(self, blast_dir, blast_db):
         for query_sid in tqdm(test_data):
@@ -135,33 +114,20 @@ class BLASTModel:
         hit = blast_result.hits[hits.index(template_sid)]
         return hit.hsps[0].aln
 
-    def generate_pairwise_aln(self, blast_dir):
-        aln_db = SeqIO.index('data/train/scop40_structural_alignment.fasta', 'fasta')
-        aln = {}
-        for i in tqdm(aln_db):
-            domkey = i.split('&')[0]
-            aln[domkey] = SeqRecord(aln_db[i].seq.ungap('-'), id=domkey, name='', description='')
-
-        for sid in tqdm(test_data):
-            Path(f'{blast_dir}/{sid}').mkdir(parents=True, exist_ok=True)
-            sunid = scop_root.getDomainBySid(sid).getAscendent('sf').sunid
-            domains = scop_root.getNodeBySunid(sunid).getDescendents('px')
-            for d in tqdm(domains):
-                if d.sid not in aln:
-                    continue
-                SeqIO.write(aln[d.sid], '.seq_b.fasta', 'fasta')
-                if self.algo == 'psiblast':
-                    SeqIO.write(aln[sid], '.seq_a.fasta', 'fasta')
-                    NcbipsiblastCommandline(query='.seq_a.fasta', subject='.seq_b.fasta',
-                                            outfmt=5, out=f'{blast_dir}/{sid}/{d.sid}.xml')()
-                elif self.algo == 'psiblast_pssm':
-                    NcbipsiblastCommandline(in_pssm=f'data/test/{sid}.pssm', subject='.seq_b.fasta',
-                                            outfmt=5, out=f'{blast_dir}/{sid}/{d.sid}.xml')()
-                elif self.algo == 'deltablast':
-                    SeqIO.write(aln[sid], '.seq_a.fasta', 'fasta')
-                    NcbideltablastCommandline(query='.seq_a.fasta', subject='.seq_b.fasta',
-                                              rpsdb='data/blastdb/cdd_delta',
-                                              outfmt=5, out=f'{blast_dir}/{sid}/{d.sid}.xml')()
+    def generate_pairwise_alignment(self, query: str, subject: str, query_id: str, target_id: str,
+                                    out_dir: str, pssm_dir: str):
+        Path(out_dir).mkdir(parents=True, exist_ok=True)
+        SeqIO.write(subject, '.seq_b.fasta', 'fasta')
+        if self.algo == 'psiblast':
+            if not Path(f'{pssm_dir}/{query_id}.pssm').exists():
+                NcbipsiblastCommandline(db=f'{self.blast_db_dir}/uniref90', num_iterations=3,
+                                        out_pssm=f'{pssm_dir}/{query_id}.pssm', save_pssm_after_last_round=True,
+                                        num_threads=os.cpu_count())(stdin=query)
+            NcbipsiblastCommandline(in_pssm=f'{pssm_dir}/{query_id}.pssm', subject='.seq_b.fasta',
+                                    outfmt=5, out=f'{out_dir}/{target_id}.xml')()
+        elif self.algo == 'deltablast':
+            NcbideltablastCommandline(subject='.seq_b.fasta', rpsdb=f'{self.blast_db_dir}/cdd_delta',
+                                      outfmt=5, out=f'{out_dir}/{target_id}.xml')(stdin=query)
 
     def generate_models_from_search(self, blast_dir):
         top = 10
