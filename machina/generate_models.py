@@ -2,6 +2,7 @@ from pathlib import Path
 import os
 import subprocess
 import random
+import re
 
 from Bio import SeqIO, Align
 from Bio.Seq import Seq
@@ -36,6 +37,17 @@ def replace_missing_residues(template_alignment, pdb):
     a = ''.join(a).replace('@', '-')
     assert len(a) == len(template_alignment)
     return a
+
+
+def _pp(path):
+    seq = []
+    for line in Path(path).read_text().splitlines():
+        token = line.rstrip('\r\n').split()
+        if len(token) == 0:
+            continue
+        if re.match(r'\d+', token[0]):
+            seq.append(token[1])
+    return Seq(''.join(seq), generic_protein)
 
 
 class MachinaModel:
@@ -114,20 +126,22 @@ class BLASTModel:
         hit = blast_result.hits[hits.index(template_sid)]
         return hit.hsps[0].aln
 
-    def generate_pairwise_alignment(self, query: str, subject: str, query_id: str, target_id: str,
-                                    out_dir: str, pssm_dir: str):
-        Path(out_dir).mkdir(parents=True, exist_ok=True)
-        SeqIO.write(subject, '.seq_b.fasta', 'fasta')
+    def generate_pairwise_alignment(self, query_id: str, target_id: str, out_dir: str, pssm_dir: str):
+        Path(f'{out_dir}/{query_id}').mkdir(parents=True, exist_ok=True)
+        SeqIO.write(
+            SeqRecord(_pp(f'{pssm_dir}/{query_id[2:4]}/{query_id}.mtx'), id=query_id), 'query.fasta', 'fasta')
+        SeqIO.write(
+            SeqRecord(_pp(f'{pssm_dir}/{target_id[2:4]}/{target_id}.mtx'), id=target_id), 'subject.fasta', 'fasta')
         if self.algo == 'psiblast':
-            if not Path(f'{pssm_dir}/{query_id}.pssm').exists():
+            if not Path(f'{pssm_dir}/{query_id[2:4]}/{query_id}.pssm').exists():
                 NcbipsiblastCommandline(db=f'{self.blast_db_dir}/uniref90', num_iterations=3,
-                                        out_pssm=f'{pssm_dir}/{query_id}.pssm', save_pssm_after_last_round=True,
-                                        num_threads=os.cpu_count())(stdin=query)
-            NcbipsiblastCommandline(in_pssm=f'{pssm_dir}/{query_id}.pssm', subject='.seq_b.fasta',
-                                    outfmt=5, out=f'{out_dir}/{target_id}.xml')()
+                                        out_pssm=f'{pssm_dir}/{query_id[2:4]}/{query_id}.pssm', query='query.fasta',
+                                        save_pssm_after_last_round=True, num_threads=os.cpu_count())()
+            NcbipsiblastCommandline(in_pssm=f'{pssm_dir}/{query_id[2:4]}/{query_id}.pssm',
+                                    subject='subject.fasta', outfmt=5, out=f'{out_dir}/{query_id}/{target_id}.xml')()
         elif self.algo == 'deltablast':
-            NcbideltablastCommandline(subject='.seq_b.fasta', rpsdb=f'{self.blast_db_dir}/cdd_delta',
-                                      outfmt=5, out=f'{out_dir}/{target_id}.xml')(stdin=query)
+            NcbideltablastCommandline(subject='subject.fasta', rpsdb=f'{self.blast_db_dir}/cdd_delta',
+                                      outfmt=5, out=f'{out_dir}/{query_id}/{target_id}.xml', query='query.fasta')()
 
     def generate_models_from_search(self, blast_dir):
         top = 10
