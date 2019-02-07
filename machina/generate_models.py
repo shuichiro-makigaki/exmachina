@@ -325,16 +325,22 @@ class HHSearchModel:
                                universal_newlines=True, check=True)
             except Exception as e:
                 print(e)
-        # index = {l.split()[0]: (int(l.split()[1]), int(l.split()[2]))
-        #          for l in Path(f'{self.hh_db_dir}/scop40_a3m.ffindex').read_text().splitlines()}
-        # if template not in index:
-        #     return
-        # with Path(f'{self.hh_db_dir}/scop40_a3m.ffdata').open() as f:
-        #     f.seek(index[template][0])
-        #     Path(f'{out_dir}/{template}.a3m').write_text(f.read(index[template][1]))
-        # arg = ['hhalign', '-glob', '-i', f'{out_dir}/{query}.a3m',
-        #        '-t', f'{out_dir}/{template}.a3m', '-o', f'{out_dir}/{template}.hhr']
-        # subprocess.run(arg, stdout=subprocess.PIPE, stderr=subprocess.PIPE, universal_newlines=True)
+                raise
+        index = {l.split()[0]: (int(l.split()[1]), int(l.split()[2]))
+                 for l in Path(f'{self.hh_db_dir}/scop40_a3m.ffindex').read_text().splitlines()}
+        if template not in index:
+            return
+        with Path(f'{self.hh_db_dir}/scop40_a3m.ffdata').open() as f:
+            f.seek(index[template][0])
+            Path(f'{out_dir}/{template}.a3m').write_text(f.read(index[template][1]))
+        arg = ['hhalign', '-glob', '-i', f'{out_dir}/{query}.a3m',
+               '-t', f'{out_dir}/{template}.a3m', '-o', f'{out_dir}/{template}.hhr']
+        try:
+            subprocess.run(arg, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
+                           universal_newlines=True, check=True)
+        except Exception as e:
+            print(e)
+            raise
 
     def generate_models_from_search(self, hhsearch_dir):
         top = 10
@@ -427,52 +433,39 @@ class HHSearchModel:
                 # subprocess.run(arg, stdout=subprocess.PIPE, stderr=subprocess.PIPE, universal_newlines=True)
                 subprocess.run(arg, universal_newlines=True)
 
-    def generate_protein_model(self, query, template, alignments_list, out_dir):
+    def generate_protein_model(self, query: str, template: str, out_dir: str, template_dir: str):
         if Path(f'{out_dir}/{template}.pdb').exists():
             return
-        if Path(f'data/scop_e/{template[2:4]}/{template}.ent').exists():
-            atom_dir = f'data/scop_e/{template[2:4]}'
-        elif Path(f'data/scop_e_all/{template[2:4]}/{template}.ent').exists():
-            atom_dir = f'data/scop_e_all/{template[2:4]}'
-        else:
+        index = {l.split()[0]: (int(l.split()[1]), int(l.split()[2]))
+                 for l in Path(f'{self.hh_db_dir}/scop40_a3m.ffindex').read_text().splitlines()}
+        if template not in index:
             return
-            # raw_lines = Path(f'{out_dir}/{query_sid}/{tmpl_sid}.hhr').read_text().splitlines()
-            # result_points = [i for i, l in enumerate(raw_lines) if l.startswith('No ')]
-            # assert len(result_points) == 1
-            # lines = raw_lines[result_points[0]:]
-            # aln_lines = [l for l in lines if l.startswith('Q ') and 'Consensus' not in l]
-            # if len(aln_lines) == 0:
-            #     continue
-            # qseq = Seq(''.join([l.split()[3] for l in aln_lines]), generic_protein)
-            # tmpl_sid = lines[1].split()[0][1:]
-            # aln_lines = [l for l in lines if l.startswith('T ') and 'Consensus' not in l]
-            # tseq = ''.join([l.split()[3] for l in aln_lines])
-            # if Path(f'data/scop_e/{tmpl_sid[2:4]}/{tmpl_sid}.ent').exists():
-            #     tseq = replace_missing_residues(tseq, f'data/scop_e/{tmpl_sid[2:4]}/{tmpl_sid}.ent')
-            # elif Path(f'data/scop_e_all/{tmpl_sid[2:4]}/{tmpl_sid}.ent').exists():
-            #     tseq = replace_missing_residues(tseq, f'data/scop_e_all/{tmpl_sid[2:4]}/{tmpl_sid}.ent')
-            # else:
-            #     print(f'{tmpl_sid}.ent is missing')
-            #     continue
-            # tseq = Seq(tseq, generic_protein)
-            # pir_file = f'{hhsearch_dir}/{query_sid}/{tmpl_sid}.pir'
-            # SeqIO.write([
-            #     SeqRecord(qseq, id=query_sid, name='', description=f'sequence:{query_sid}::::::::'),
-            #     SeqRecord(tseq, id=tmpl_sid, name='',
-            #               description=f'structureX:{tmpl_sid}::{tmpl_sid[5].upper()}::{tmpl_sid[5].upper()}::::')
-            # ], pir_file, 'pir')
-            # Path(f'{hhsearch_dir}/{query_sid}/{tmpl_sid}.hhr').unlink()
 
-        tseq = replace_missing_residues(str(best[1]), f'data/scop_e/{template[2:4]}/{template}.ent')
+        raw_lines = Path(f'{out_dir}/{template}.hhr').read_text().splitlines()
+        result_points = [i for i, l in enumerate(raw_lines) if l.startswith('No ')]
+        assert len(result_points) == 1
+        # Get query alignment
+        lines = raw_lines[result_points[0]:]
+        aln_lines = [l for l in lines if l.startswith('Q ') and 'Consensus' not in l]
+        if len(aln_lines) == 0:
+            return
+        qseq = Seq(''.join([l.split()[3] for l in aln_lines]), generic_protein)
+        # Get template alignment
+        aln_lines = [l for l in lines if l.startswith('T ') and 'Consensus' not in l]
+        tseq = ''.join([l.split()[3] for l in aln_lines])
+        tseq = Seq(replace_missing_residues(tseq, f'{template_dir}/{template}.ent'), generic_protein)
+
         pir_file = f'{out_dir}/{template}.pir'
         SeqIO.write([
-            SeqRecord(Seq(str(best[0]), generic_protein), id=query, name='',
-                      description=f'sequence:{query}::::::::'),
-            SeqRecord(Seq(tseq, generic_protein), id=template, name='',
+            SeqRecord(qseq, id=query, name='', description=f'sequence:{query}::::::::'),
+            SeqRecord(tseq, id=template, name='',
                       description=f'structureX:{template}::{template[5].upper()}::{template[5].upper()}::::')
         ], pir_file, 'pir')
-        Path(out_dir).mkdir(parents=True, exist_ok=True)
-        # arg = ['mod9.20', 'machina/modeller_script.py', pir_file, template, query, f'data/scop_e/{d.sid[2:4]}']
-        arg = ['/opt/modeller-9.20/bin/modpy.sh', 'python3', 'machina/modeller_script.py',
-               pir_file, template, query, atom_dir]
-        subprocess.run(arg, stdout=subprocess.PIPE, stderr=subprocess.PIPE, universal_newlines=True)
+
+        arg = ['/opt/modeller-9.20/bin/modpy.sh', 'python3',
+               Path(__file__).parent.resolve()/'modeller_script.py', pir_file, template, query, template_dir]
+        try:
+            subprocess.run(arg, stdout=subprocess.PIPE, stderr=subprocess.PIPE, universal_newlines=True, check=True)
+        except Exception as e:
+            print(e)
+            raise
