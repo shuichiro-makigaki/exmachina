@@ -183,89 +183,38 @@ class BLASTModel:
 
 
 class TMalignModel:
-    def generate_models(self, out_dir):
-        aln_db = SeqIO.index('data/scop40_structural_alignment.fasta', 'fasta')
-        for sid in tqdm(test_data):
-            Path(f'{out_dir}/{sid}').mkdir(parents=True, exist_ok=True)
-            sunid = scop_root.getDomainBySid(sid).getAscendent('sf').sunid
-            domains = scop_root.getNodeBySunid(sunid).getDescendents('px')
-            for d in tqdm(domains):
-                pir_file = f'{out_dir}/{sid}/{d.sid}.pir'
-                try:
-                    SeqIO.write([
-                        SeqRecord(Seq(str(aln_db[f'{sid}&{d.sid}'].seq), generic_protein), id=sid, name='',
-                                  description=f'sequence:{sid}::::::::'),
-                        SeqRecord(Seq(str(aln_db[f'{d.sid}&{sid}'].seq), generic_protein), id=d.sid, name='',
-                                  description=f'structureX:{d.sid}::{d.sid[5].upper()}::{d.sid[5].upper()}::::')
-                    ], pir_file, 'pir')
-                except KeyError:
-                    continue
-                arg = ['mod9.20', 'modeller_script.py', pir_file, d.sid, sid, f'data/scop_e/{d.sid[2:4]}']
-                subprocess.run(arg, stdout=subprocess.PIPE, stderr=subprocess.PIPE, universal_newlines=True)
+    def __init__(self, modpy_sh_path='/opt/modeller-9.20/bin/modpy.sh'):
+        self.modpysh = modpy_sh_path
 
-    def generate_protein_model(self, query, template, alignments_list, out_dir):
-        if Path(f'{out_dir}/{template}.pdb').exists():
-            return
-        if not Path(f'data/scop_e/{template[2:4]}/{template}.ent').exists():
-            return
+    def generate_protein_model(self, query: str, template: str, alignments: SeqIO, template_dir: str, out_dir: str):
         pir_file = f'{out_dir}/{template}.pir'
-        tseq = replace_missing_residues(str(alignments_list[f'{template}&{query}'].seq),
-                                        f'data/scop_e/{template[2:4]}/{template}.ent')
+        tseq = replace_missing_residues(str(alignments[f'{template}&{query}'].seq),
+                                        f'{template_dir}/{template}.ent')
         Path(out_dir).mkdir(parents=True, exist_ok=True)
         SeqIO.write([
-            SeqRecord(Seq(str(alignments_list[f'{query}&{template}'].seq).replace('\n', ''), generic_protein),
+            SeqRecord(Seq(str(alignments[f'{query}&{template}'].seq).replace('\n', ''), generic_protein),
                       id=query, name='', description=f'sequence:{query}::::::::'),
             SeqRecord(Seq(tseq, generic_protein), id=template, name='',
                       description=f'structureX:{template}::{template[5].upper()}::{template[5].upper()}::::')
         ], pir_file, 'pir')
-        # arg = ['mod9.20', 'machina/modeller_script.py', pir_file, template, query, f'data/scop_e/{d.sid[2:4]}']
-        arg = ['/opt/modeller-9.20/bin/modpy.sh', 'python3', 'machina/modeller_script.py',
-               pir_file, template, query, f'data/scop_e/{template[2:4]}']
-        subprocess.run(arg, stdout=subprocess.PIPE, stderr=subprocess.PIPE, universal_newlines=True)
+        arg = [self.modpysh, 'python3', Path(__file__).parent.resolve()/'modeller_script.py',
+               pir_file, template, query, template_dir]
+        subprocess.run(arg, stdout=subprocess.PIPE, stderr=subprocess.PIPE, universal_newlines=True, check=True)
 
 
 class SWModel:
-    def __init__(self, gap_open, gap_extend):
+    def __init__(self, gap_open, gap_extend, modpy_sh_path='/opt/modeller-9.20/bin/modpy.sh'):
         self.gap_open = gap_open
         self.gap_extend = gap_extend
+        self.modpysh = modpy_sh_path
 
-    def generate_models(self):
-        aln_db = SeqIO.index('data/train/scop40_structural_alignment.fasta', 'fasta')
-        out_dir = f'data/.sw_aln/open{-self.gap_open}_extend{-self.gap_extend}'
-        for sid in tqdm(test_data):
-            Path(f'{out_dir}/{sid}').mkdir(parents=True, exist_ok=True)
-            sunid = scop_root.getDomainBySid(sid).getAscendent('sf').sunid
-            domains = scop_root.getNodeBySunid(sunid).getDescendents('px')
-            for d in tqdm(domains):
-                try:
-                    ali = pairwise2.align.localds(str(aln_db[f'{sid}&{d.sid}'].seq.ungap('-')),
-                                                  str(aln_db[f'{d.sid}&{sid}'].seq.ungap('-')),
-                                                  MatrixInfo.blosum62, self.gap_open, self.gap_extend)
-                except KeyError:
-                    continue
-                pir_file = f'{out_dir}/{sid}/{d.sid}.pir'
-                best = ali[np.argmax([x[2] for x in ali])]
-                SeqIO.write([
-                    SeqRecord(Seq(str(best[0]), generic_protein), id=sid, name='',
-                              description=f'sequence:{sid}::::::::'),
-                    SeqRecord(Seq(str(best[1]), generic_protein), id=d.sid, name='',
-                              description=f'structureX:{d.sid}::{d.sid[5].upper()}::{d.sid[5].upper()}::::')
-                ], pir_file, 'pir')
-                arg = ['mod9.20', 'modeller_script.py', pir_file, d.sid, sid, f'data/scop_e/{d.sid[2:4]}']
-                arg = ['/usr/lib/modeller9.20/bin/modpy.sh', 'python3', 'modeller_script.py',
-                       pir_file, d.sid, sid, f'data/scop_e/{d.sid[2:4]}']
-                subprocess.run(arg, stdout=subprocess.PIPE, stderr=subprocess.PIPE, universal_newlines=True)
-
-    def generate_protein_model(self, query, template, alignments_list, out_dir):
-        if Path(f'{out_dir}/{template}.pdb').exists():
-            return
-        if not Path(f'data/scop_e/{template[2:4]}/{template}.ent').exists():
-            return
-        ali = pairwise2.align.localds(str(alignments_list[f'{query}&{template}'].seq.ungap('-')),
-                                      str(alignments_list[f'{template}&{query}'].seq.ungap('-')),
+    def generate_protein_model(self, query: str, template: str, alignments: SeqRecord, template_dir: str, out_dir: str):
+        ali = pairwise2.align.localds(str(alignments[f'{query}&{template}'].seq.ungap('-')),
+                                      str(alignments[f'{template}&{query}'].seq.ungap('-')),
                                       MatrixInfo.blosum62, self.gap_open, self.gap_extend)
         best = ali[np.argmax([_[2] for _ in ali])]
-        tseq = replace_missing_residues(str(best[1]), f'data/scop_e/{template[2:4]}/{template}.ent')
+        tseq = replace_missing_residues(str(best[1]), f'{template_dir}/{template}.ent')
+        Path(out_dir).mkdir(parents=True, exist_ok=True)
         pir_file = f'{out_dir}/{template}.pir'
         SeqIO.write([
             SeqRecord(Seq(str(best[0]), generic_protein), id=query, name='',
@@ -274,10 +223,9 @@ class SWModel:
                       description=f'structureX:{template}::{template[5].upper()}::{template[5].upper()}::::')
         ], pir_file, 'pir')
         Path(out_dir).mkdir(parents=True, exist_ok=True)
-        # arg = ['mod9.20', 'machina/modeller_script.py', pir_file, template, query, f'data/scop_e/{d.sid[2:4]}']
-        arg = ['/opt/modeller-9.20/bin/modpy.sh', 'python3', 'machina/modeller_script.py',
-               pir_file, template, query, f'data/scop_e/{template[2:4]}']
-        subprocess.run(arg, stdout=subprocess.PIPE, stderr=subprocess.PIPE, universal_newlines=True)
+        arg = [self.modpysh, 'python3', Path(__file__).parent.resolve()/'modeller_script.py',
+               pir_file, template, query, template_dir]
+        subprocess.run(arg, stdout=subprocess.PIPE, stderr=subprocess.PIPE, universal_newlines=True, check=True)
 
 
 class HHSearchModel:
