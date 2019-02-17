@@ -135,10 +135,10 @@ class BLASTModel:
                 NcbipsiblastCommandline(db=f'{self.blast_db_dir}/uniref90', num_iterations=3,
                                         out_pssm=f'{pssm_dir}/{query_id[2:4]}/{query_id}.pssm', query='query.fasta',
                                         save_pssm_after_last_round=True, num_threads=os.cpu_count())()
-            NcbipsiblastCommandline(in_pssm=f'{pssm_dir}/{query_id[2:4]}/{query_id}.pssm',
+            NcbipsiblastCommandline(in_pssm=f'{pssm_dir}/{query_id[2:4]}/{query_id}.pssm', evalue=99999,
                                     subject='subject.fasta', outfmt=5, out=f'{out_dir}/{query_id}/{target_id}.xml')()
         elif self.algo == 'deltablast':
-            NcbideltablastCommandline(subject='subject.fasta', rpsdb=f'{self.blast_db_dir}/cdd_delta',
+            NcbideltablastCommandline(subject='subject.fasta', rpsdb=f'{self.blast_db_dir}/cdd_delta', evalue=99999,
                                       outfmt=5, out=f'{out_dir}/{query_id}/{target_id}.xml', query='query.fasta')()
 
     def generate_models_from_search(self, blast_dir):
