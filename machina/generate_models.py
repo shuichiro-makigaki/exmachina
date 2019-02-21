@@ -111,7 +111,7 @@ class BLASTModel:
 
     def generate_search_result(self, blast_dir, blast_db):
         for query_sid in tqdm(test_data):
-            Path(f'{blast_dir}/{query_sid}').mkdir(parents=True, exists=True)
+            Path(f'{blast_dir}/{query_sid}').mkdir(parents=True, exist_ok=True)
             xml_f = Path(f'{blast_dir}/{query_sid}/{query_sid}.xml')
             pssm_f = Path(f'data/test/{query_sid}.pssm')
             if self.algo == 'psiblast_iter3':
@@ -229,7 +229,8 @@ class SWModel:
 
 
 class HHSearchModel:
-    def __init__(self, hh_db_dir: str):
+    def __init__(self, hh_db_dir: str, modpy_sh_path='/opt/modeller-9.20/bin/modpy.sh'):
+        self.modpysh = modpy_sh_path
         self.hh_db_dir = hh_db_dir
 
     def generate_query_a3m(self, hhsearch_dir, db_path='/DB/uniclust30_2017_10'):
@@ -382,13 +383,8 @@ class HHSearchModel:
                 subprocess.run(arg, universal_newlines=True)
 
     def generate_protein_model(self, query: str, template: str, out_dir: str, template_dir: str):
-        if Path(f'{out_dir}/{template}.pdb').exists():
+        if not Path(f'{out_dir}/{template}.hhr').exists():
             return
-        index = {l.split()[0]: (int(l.split()[1]), int(l.split()[2]))
-                 for l in Path(f'{self.hh_db_dir}/scop40_a3m.ffindex').read_text().splitlines()}
-        if template not in index:
-            return
-
         raw_lines = Path(f'{out_dir}/{template}.hhr').read_text().splitlines()
         result_points = [i for i, l in enumerate(raw_lines) if l.startswith('No ')]
         assert len(result_points) == 1
@@ -402,16 +398,14 @@ class HHSearchModel:
         aln_lines = [l for l in lines if l.startswith('T ') and 'Consensus' not in l]
         tseq = ''.join([l.split()[3] for l in aln_lines])
         tseq = Seq(replace_missing_residues(tseq, f'{template_dir}/{template}.ent'), generic_protein)
-
         pir_file = f'{out_dir}/{template}.pir'
         SeqIO.write([
             SeqRecord(qseq, id=query, name='', description=f'sequence:{query}::::::::'),
             SeqRecord(tseq, id=template, name='',
                       description=f'structureX:{template}::{template[5].upper()}::{template[5].upper()}::::')
         ], pir_file, 'pir')
-
-        arg = ['/opt/modeller-9.20/bin/modpy.sh', 'python3',
-               Path(__file__).parent.resolve()/'modeller_script.py', pir_file, template, query, template_dir]
+        arg = [self.modpysh, 'python3', Path(__file__).parent.resolve()/'modeller_script.py',
+               pir_file, template, query, template_dir]
         try:
             subprocess.run(arg, stdout=subprocess.PIPE, stderr=subprocess.PIPE, universal_newlines=True, check=True)
         except Exception as e:
