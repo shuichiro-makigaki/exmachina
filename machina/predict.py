@@ -20,7 +20,7 @@ logging.basicConfig(format='%(asctime)s [%(levelname)s] %(message)s', level=logg
 AA = ['A', 'R', 'N', 'D', 'C', 'Q', 'E', 'G', 'H', 'I',
       'L', 'K', 'M', 'F', 'P', 'S', 'T', 'W', 'Y', 'V']
 # ToDo: Assert AA order in original PSSM file
-WINDOW_WIDTH = 5
+WINDOW_WIDTH = 3
 WINDOW_CENTER = int(WINDOW_WIDTH / 2)
 USE_PADDING_LABEL = False
 # MODEL_NAME = 'NN_scop40_tmscore50_w9_downsampling_ep20_ba512'
