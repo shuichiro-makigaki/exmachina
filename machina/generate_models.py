@@ -61,7 +61,7 @@ class MachinaModel:
         return sorted(result_d.items(), key=lambda x: x[1][2], reverse=True)[:n_top]
 
     @classmethod
-    def generate_protein_models_from_search(cls, search_result, query, out_dir, n_top=10):
+    def generate_protein_models_after_search(cls, search_result, query, out_dir, n_top=10):
         Path(out_dir).mkdir(parents=True, exist_ok=True)
         for r in cls._get_top_aln(search_result, n_top):
             template = r[0]
