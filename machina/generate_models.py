@@ -52,18 +52,20 @@ def _pp(path):
 
 class MachinaModel:
     @staticmethod
-    def _get_top_aln(search_result, n_top):
+    def _get_top_aln(prediction_results_dir, n_top):
         result_d = {}
-        for r in np.load(search_result):
-            key = list(r.keys())[0]
-            bst = np.argmax([x[2] for x in r[key]])
-            result_d[key] = r[key][bst]
-        return sorted(result_d.items(), key=lambda x: x[1][2], reverse=True)[:n_top]
+        for f in list(Path(prediction_results_dir).glob('d*.npy'))[:1]:
+            print(np.load(f))
+#         for r in np.load(search_result):
+#             key = list(r.keys())[0]
+#             bst = np.argmax([x[2] for x in r[key]])
+#             result_d[key] = r[key][bst]
+#         return sorted(result_d.items(), key=lambda x: x[1][2], reverse=True)[:n_top]
 
     @classmethod
-    def generate_protein_models_after_search(cls, search_result, query, out_dir, n_top=10):
+    def generate_protein_models_from_search(cls, prediction_results_dir: str, query: str, out_dir: str, n_top=10):
         Path(out_dir).mkdir(parents=True, exist_ok=True)
-        for r in cls._get_top_aln(search_result, n_top):
+        for r in cls._get_top_aln(prediction_results_dir, n_top):
             template = r[0]
             if Path(f'{out_dir}/{template}.pdb').exists():
                 continue

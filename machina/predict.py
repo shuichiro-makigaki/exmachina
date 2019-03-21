@@ -171,7 +171,7 @@ def predict_by_flann(x_path: str, y_path: str, model_path: str, num_neighbors: i
                 [np.count_nonzero(y[_])/num_neighbors for _ in result]).reshape((len(pssm1.pssm), len(pssm2.pssm)))
             np.save(fname, proba)
         except Exception as e:
-            print(e)
+            logging.debug(e)
 
 
 def _predict_by_rfc(args):  # args = [(px1, px2), ...]
