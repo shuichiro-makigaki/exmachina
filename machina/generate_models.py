@@ -51,41 +51,10 @@ def _pp(path):
 
 
 class MachinaModel:
-    @staticmethod
-    def _get_top_aln(prediction_results_dir, n_top):
-        result_d = {}
-        for f in list(Path(prediction_results_dir).glob('d*.npy'))[:1]:
-            print(np.load(f))
-#         for r in np.load(search_result):
-#             key = list(r.keys())[0]
-#             bst = np.argmax([x[2] for x in r[key]])
-#             result_d[key] = r[key][bst]
-#         return sorted(result_d.items(), key=lambda x: x[1][2], reverse=True)[:n_top]
+    def __init__(self, modpy_sh_path='/opt/modeller-9.20/bin/modpy.sh'):
+        self.modpysh = modpy_sh_path
 
-    @classmethod
-    def generate_protein_models_from_search(cls, prediction_results_dir: str, query: str, out_dir: str, n_top=10):
-        Path(out_dir).mkdir(parents=True, exist_ok=True)
-        for r in cls._get_top_aln(prediction_results_dir, n_top):
-            template = r[0]
-            if Path(f'{out_dir}/{template}.pdb').exists():
-                continue
-            if not Path(f'data/scop_e/{template[2:4]}/{template}.ent').exists():
-                continue
-            aln = r[1]
-            pir_file = f'{out_dir}/{template}.pir'
-            tseq = replace_missing_residues(aln[1], f'data/scop_e/{template[2:4]}/{template}.ent')
-            SeqIO.write([
-                SeqRecord(Seq(aln[0], generic_protein), id=query, name='',
-                          description=f'sequence:{query}::::::::'),
-                SeqRecord(Seq(tseq, generic_protein), id=template, name='',
-                          description=f'structureX:{template}::{template[5].upper()}::{template[5].upper()}::::')
-            ], pir_file, 'pir')
-            arg = ['/opt/modeller-9.20/bin/modpy.sh', 'python3', 'machina/modeller_script.py',
-                   pir_file, template, query, f'data/scop_e/{template[2:4]}']
-            subprocess.run(arg, stdout=subprocess.PIPE, stderr=subprocess.PIPE, universal_newlines=True)
-
-    @staticmethod
-    def generate_protein_model(query: str, template: str, alignments_list: str, out_dir: str, template_dir: str):
+    def generate_protein_model(self, query: str, template: str, alignments_list: str, out_dir: str, template_dir: str):
         aln = np.load(alignments_list)
         best = aln[np.argmax([_[2] for _ in aln])]
         pir_file = f'{out_dir}/{template}.pir'
@@ -96,35 +65,16 @@ class MachinaModel:
             SeqRecord(Seq(tseq, generic_protein), id=template, name='',
                       description=f'structureX:{template}::{template[5].upper()}::{template[5].upper()}::::')
         ], pir_file, 'pir')
-        arg = ['/opt/modeller-9.20/bin/modpy.sh', 'python3', Path(__file__).parent.resolve()/'modeller_script.py',
+        arg = [self.modpysh, 'python3', Path(__file__).parent.resolve()/'modeller_script.py',
                pir_file, template, query, template_dir]
         subprocess.run(arg, stdout=subprocess.PIPE, stderr=subprocess.PIPE, universal_newlines=True)
 
 
 class BLASTModel:
-    def __init__(self, algo, blast_db_dir):
+    def __init__(self, algo, blast_db_dir, modpy_sh_path='/opt/modeller-9.20/bin/modpy.sh'):
         self.algo = algo
         self.blast_db_dir = blast_db_dir
-
-    def _get_best_hsp(self, blast_result, template_sid):
-        hits = [_ for _ in blast_result.hits if _.id == template_sid]
-        assert len(hits) > 0
-        return hits[0].hsps[0].aln
-
-    def generate_search_result(self, blast_dir, blast_db):
-        for query_sid in tqdm(test_data):
-            Path(f'{blast_dir}/{query_sid}').mkdir(parents=True, exist_ok=True)
-            xml_f = Path(f'{blast_dir}/{query_sid}/{query_sid}.xml')
-            pssm_f = Path(f'data/test/{query_sid}.pssm')
-            if self.algo == 'psiblast_iter3':
-                NcbipsiblastCommandline(in_pssm=pssm_f.as_posix(),
-                                        db=f'{blast_db}/astral-scopdom-seqres-gd-sel-gs-bib-40-1.75_train_only',
-                                        num_threads=int(os.cpu_count()),
-                                        num_iterations=3,
-                                        max_target_seqs=500,
-                                        evalue=999999,
-                                        outfmt=5,
-                                        out=xml_f.as_posix())()
+        self.modpysh = modpy_sh_path
 
     def generate_pairwise_alignment(self, query_id: str, target_id: str, out_dir: str, pssm_dir: str):
         Path(f'{out_dir}/{query_id}').mkdir(parents=True, exist_ok=True)
@@ -143,34 +93,12 @@ class BLASTModel:
             NcbideltablastCommandline(subject='subject.fasta', rpsdb=f'{self.blast_db_dir}/cdd_delta', evalue=99999,
                                       outfmt=5, out=f'{out_dir}/{query_id}/{target_id}.xml', query='query.fasta')()
 
-    def generate_models_from_search(self, blast_dir):
-        top = 10
-        blast_result = next(SearchIO.parse(f'{blast_dir}/{query_sid}.xml', 'blast-xml'))
-        Path(f'{blast_dir}_top{top}/{query_sid}').mkdir(parents=True, exist_ok=True)
-        for hit in tqdm(blast_result.hits[:top]):
-            hsp = hit.hsps[0]
-            template_id = hsp.aln[1].id
-            if Path(f'{blast_dir}_top{top}/{query_sid}/{template_id}.pdb').exists():
-                continue
-            if not Path(f'data/scop_e/{template_id[2:4]}/{template_id}.ent').exists():
-                continue
-            tseq = replace_missing_residues(str(hsp.aln[1].seq), f'data/scop_e/{template_id[2:4]}/{template_id}.ent')
-            chain = template_id[5].upper()
-            pir_file = f'{blast_dir}_top{top}/{query_sid}/{template_id}.pir'
-            SeqIO.write([
-                SeqRecord(Seq(str(hsp.aln[0].seq), generic_protein), id=query_sid, name='',
-                          description=f'sequence:{query_sid}::::::::'),
-                SeqRecord(Seq(tseq, generic_protein), id=template_id, name='',
-                          description=f'structureX:{template_id}::{chain}::{chain}::::')
-            ], pir_file, 'pir')
-            arg = ['modpy.sh', 'python3', 'modeller_script.py', pir_file, template_id, query_sid, f'data/scop_e/{template_id[2:4]}']
-            subprocess.run(arg, stdout=subprocess.PIPE, stderr=subprocess.PIPE, universal_newlines=True)
-
     def generate_protein_model(self, query: str, template: str, blast_xml_path: str, out_dir: str, template_dir: str):
         hits = [_ for _ in SearchIO.read(blast_xml_path, 'blast-xml').hits if _.id == template]
         assert len(hits) == 1
         best = hits[0].hsps[0].aln
         tseq = replace_missing_residues(str(best[1].seq), f'{template_dir}/{template}.ent')
+        Path(out_dir).mkdir(parents=True, exist_ok=True)
         pir_file = f'{out_dir}/{template}.pir'
         SeqIO.write([
             SeqRecord(Seq(str(best[0].seq), generic_protein), id=query, name='',
@@ -178,8 +106,7 @@ class BLASTModel:
             SeqRecord(Seq(tseq, generic_protein), id=template, name='',
                       description=f'structureX:{template}::{template[5].upper()}::{template[5].upper()}::::')
         ], pir_file, 'pir')
-        Path(out_dir).mkdir(parents=True, exist_ok=True)
-        arg = ['/opt/modeller-9.20/bin/modpy.sh', 'python3', Path(__file__).parent.resolve()/'modeller_script.py',
+        arg = [self.modpysh, 'python3', Path(__file__).parent.resolve()/'modeller_script.py',
                pir_file, template, query, template_dir]
         subprocess.run(arg, stdout=subprocess.PIPE, stderr=subprocess.PIPE, universal_newlines=True)
 
@@ -252,19 +179,6 @@ class HHSearchModel:
                    '-o', '/dev/null', '-oa3m', f'{query_sid}.a3m', '-cpu', os.cpu_count()]
             subprocess.run(arg, stdout=subprocess.PIPE, stderr=subprocess.PIPE, universal_newlines=True)
 
-    def generate_search_result(self, hhsearch_dir, db_dir='/DB/scop40'):
-        for query_sid in tqdm(test_data):
-            arg = ['hhsearch', '-i', f'{query_sid}.a3m', '-d', db_dir, '-cpu', '64', '-z', '500', '-b', '500']
-            subprocess.run(arg, cwd=f'{hhsearch_dir}/{query_sid}',
-                           stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-
-    def generate_search_result_global(self, hhsearch_dir, db_dir='/DB/scop40'):
-        for query_sid in tqdm(test_data):
-            arg = ['hhsearch', '-i', f'{query_sid}.a3m', '-d', db_dir, '-cpu', '64', '-z', '500', '-b', '500',
-                   '-glob', '-o', f'{query_sid}_global_aln.hhr']
-            subprocess.run(arg, cwd=f'{hhsearch_dir}/{query_sid}',
-                           stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-
     def generate_pairwise_alignment(self, query: str, template: str, query_record: SeqRecord, out_dir: str):
         Path(out_dir).mkdir(exist_ok=True, parents=True)
         if not Path(f'{out_dir}/{query}.a3m').exists():
@@ -293,96 +207,49 @@ class HHSearchModel:
             print(e)
             raise
 
-    def generate_models_from_search(self, hhsearch_dir):
-        top = 10
-        for query_sid in tqdm(test_data):
-            raw_lines = Path(f'{hhsearch_dir}/{query_sid}/{query_sid}.hhr').read_text().splitlines()
-            result_points = [i for i, l in enumerate(raw_lines) if l.startswith('No ')]
-            assert len(result_points) > 5
-            for i, _ in enumerate(result_points[:top]):
-                if i == len(result_points)-1:
-                    lines = raw_lines[result_points[i]:]
-                else:
-                    lines = raw_lines[result_points[i]:result_points[i+1]]
-                aln_lines = [l for l in lines if l.startswith('Q ') and 'Consensus' not in l]
-                qseq = Seq(''.join([l.split()[3] for l in aln_lines]), generic_protein)
-                tmpl_sid = lines[1].split()[0][1:]
-                aln_lines = [l for l in lines if l.startswith('T ') and 'Consensus' not in l]
-                tseq = Seq(''.join([l.split()[3] for l in aln_lines]), generic_protein)
-                Path(f'{hhsearch_dir}/{query_sid}/top{top}').mkdir(parents=True, exist_ok=True)
-                pir_file = f'{hhsearch_dir}/{query_sid}/top{top}/{tmpl_sid}.pir'
-                SeqIO.write([
-                    SeqRecord(qseq, id=query_sid, name='', description=f'sequence:{query_sid}::::::::'),
-                    SeqRecord(tseq, id=tmpl_sid, name='',
-                              description=f'structureX:{tmpl_sid}::{tmpl_sid[5].upper()}::{tmpl_sid[5].upper()}::::')
-                ], pir_file, 'pir')
-                # arg = ['mod9.18', 'modeller_script.py', pir_file, tmpl_sid, query_sid, f'data/scop_e/{tmpl_sid[2:4]}']
-                arg = ['modpy.sh', 'python3', 'modeller_script.py', pir_file, tmpl_sid, query_sid, f'data/scop_e/{tmpl_sid[2:4]}']
-                subprocess.run(arg, stdout=subprocess.PIPE, stderr=subprocess.PIPE, universal_newlines=True)
-
-    def generate_models_from_search_global(self, hhsearch_dir):
-        top = 10
-        for query_sid in tqdm(test_data):
-            raw_lines = Path(f'{hhsearch_dir}/{query_sid}/{query_sid}_global_aln.hhr').read_text().splitlines()
-            result_points = [i for i, l in enumerate(raw_lines) if l.startswith('No ')]
-            assert len(result_points) > 5
-            for i, _ in enumerate(result_points[:top]):
-                if i == len(result_points)-1:
-                    lines = raw_lines[result_points[i]:]
-                else:
-                    lines = raw_lines[result_points[i]:result_points[i+1]]
-                aln_lines = [l for l in lines if l.startswith('Q ') and 'Consensus' not in l]
-                qseq = Seq(''.join([l.split()[3] for l in aln_lines]), generic_protein)
-                tmpl_sid = lines[1].split()[0][1:]
-                aln_lines = [l for l in lines if l.startswith('T ') and 'Consensus' not in l]
-                tseq = ''.join([l.split()[3] for l in aln_lines])
-                scop_e_dir = 'data/scop_e_all'
-                if Path(f'{hhsearch_dir}/{query_sid}/top{top}_global_aln/{tmpl_sid}.pdb').exists():
-                    continue
-                if not Path(f'{scop_e_dir}/{tmpl_sid[2:4]}/{tmpl_sid}.ent').exists():
-                    continue
-                tseq = replace_missing_residues(tseq, f'{scop_e_dir}/{tmpl_sid[2:4]}/{tmpl_sid}.ent')
-                tseq = Seq(tseq, generic_protein)
-                Path(f'{hhsearch_dir}/{query_sid}/top{top}_global_aln').mkdir(parents=True, exist_ok=True)
-                pir_file = f'{hhsearch_dir}/{query_sid}/top{top}_global_aln/{tmpl_sid}.pir'
-                SeqIO.write([
-                    SeqRecord(qseq, id=query_sid, name='', description=f'sequence:{query_sid}::::::::'),
-                    SeqRecord(tseq, id=tmpl_sid, name='',
-                              description=f'structureX:{tmpl_sid}::{tmpl_sid[5].upper()}::{tmpl_sid[5].upper()}::::')
-                ], pir_file, 'pir')
-                # arg = ['mod9.18', 'modeller_script.py', pir_file, tmpl_sid, query_sid, f'data/scop_e/{tmpl_sid[2:4]}']
-                arg = ['modpy.sh', 'python3', 'modeller_script.py', pir_file, tmpl_sid, query_sid, f'{scop_e_dir}/{tmpl_sid[2:4]}']
-                # subprocess.run(arg, stdout=subprocess.PIPE, stderr=subprocess.PIPE, universal_newlines=True)
-                subprocess.run(arg, universal_newlines=True)
-
-    def generate_models(self, hhsearch_dir, db_dir):
-        hhm = f'{db_dir}/scop40_hhm.ffdata'
-        hie_d = {}
-        for line in [_ for _ in Path(hhm).read_text().splitlines() if _.startswith('NAME ')]:
-            domain_sid = line.split()[1]
-            sf_sccs = '.'.join(line.split()[2].split('.')[:3])
-            if sf_sccs not in hie_d:
-                hie_d[sf_sccs] = [domain_sid]
+    def generate_protein_models_from_search(self, query: str, hhr_path: str, out_dir: str, template_dir: str, count=10):
+        raw_lines = Path(hhr_path).read_text().splitlines()
+        result_points = [i for i, l in enumerate(raw_lines) if l.startswith('No ')]
+        created = []
+        for i, _ in enumerate(result_points):
+            if i == len(result_points)-1:
+                lines = raw_lines[result_points[i]:]
             else:
-                hie_d[sf_sccs].append(domain_sid)
-        for query_sid in tqdm(test_data):
-            query_sf_sccs = test_data[query_sid][1]
-            if query_sf_sccs not in hie_d:
-                print(f'!!! {query_sf_sccs} is not in HHsearch SCOP40 DB !!!')
+                lines = raw_lines[result_points[i]:result_points[i+1]]
+            aln_lines = [l for l in lines if l.startswith('Q ') and 'Consensus' not in l]
+            if len(aln_lines) < 1:
                 continue
-            for tmpl_sid in tqdm([_ for _ in hie_d[query_sf_sccs] if _ != query_sid]):
-                if Path(f'{hhsearch_dir}/{query_sid}/{tmpl_sid}.pdb').exists():
-                    continue
-                if Path(f'data/scop_e/{tmpl_sid[2:4]}/{tmpl_sid}.ent').exists():
-                    atom_dir = f'data/scop_e/{tmpl_sid[2:4]}'
-                elif Path(f'data/scop_e_all/{tmpl_sid[2:4]}/{tmpl_sid}.ent').exists():
-                    atom_dir = f'data/scop_e_all/{tmpl_sid[2:4]}'
-                else:
-                    continue
-                arg = ['modpy.sh', 'python3', 'modeller_script.py',
-                       f'{hhsearch_dir}/{query_sid}/{tmpl_sid}.pir', tmpl_sid, query_sid, atom_dir]
-                # subprocess.run(arg, stdout=subprocess.PIPE, stderr=subprocess.PIPE, universal_newlines=True)
-                subprocess.run(arg, universal_newlines=True)
+            qseq = Seq(''.join([l.split()[3] for l in aln_lines]), generic_protein)
+            template = lines[1].split()[0][1:]
+            if template in created:
+                continue
+            aln_lines = [l for l in lines if l.startswith('T ') and 'Consensus' not in l]
+            try:
+                tseq = replace_missing_residues(''.join([l.split()[3] for l in aln_lines]),
+                                                f'{template_dir}/{template[2:4]}/{template}.ent')
+            except Exception as e:
+                print(f'wget -O {template[2:4]}/{template}.ent http://scop.berkeley.edu/downloads/pdbstyle/pdbstyle-2.07/{template[2:4]}/{template}.ent')
+                continue
+            tseq = Seq(tseq, generic_protein)
+            Path(out_dir).mkdir(parents=True, exist_ok=True)
+            pir_file = f'{out_dir}/{template}.pir'
+            SeqIO.write([
+                SeqRecord(qseq, id=query, name='', description=f'sequence:{query}::::::::'),
+                SeqRecord(tseq, id=template, name='',
+                          description=f'structureX:{template}::{template[5].upper()}::{template[5].upper()}::::')
+            ], pir_file, 'pir')
+            arg = [self.modpysh, 'python3', Path(__file__).parent.resolve()/'modeller_script.py',
+                   pir_file, template, query, f'{template_dir}/{template[2:4]}']
+            try:
+                result = subprocess.run(arg, stdout=subprocess.PIPE, stderr=subprocess.PIPE, universal_newlines=True, check=True)
+            except Exception as e:
+                print(e)
+                print(result.stdout)
+                print(result.stderr)
+                continue
+            created.append(template)
+            if len(created) == count:
+                break
 
     def generate_protein_model(self, query: str, template: str, out_dir: str, template_dir: str):
         if not Path(f'{out_dir}/{template}.hhr').exists():
