@@ -162,16 +162,12 @@ def predict_by_flann(x_path: str, y_path: str, model_path: str, num_neighbors: i
         if fname.exists():
             continue
         out_query_dir.mkdir(exist_ok=True, parents=True)
-        try:
-            pssm1 = parse_pssm(f'{pssm_dir}/{query[2:4]}/{query}.mtx')
-            pssm2 = parse_pssm(f'{pssm_dir}/{template[2:4]}/{template}.mtx')
-            samples = _get_test_vector_set(pssm1, pssm2, x.shape[1]).astype(np.int32)
-            result, _ = model.nn_index(samples, num_neighbors=num_neighbors)
-            proba = np.array(
-                [np.count_nonzero(y[_])/num_neighbors for _ in result]).reshape((len(pssm1.pssm), len(pssm2.pssm)))
-            np.save(fname, proba)
-        except Exception as e:
-            logging.debug(e)
+        pssm1 = parse_pssm(f'{pssm_dir}/{query[2:4]}/{query}.mtx')
+        pssm2 = parse_pssm(f'{pssm_dir}/{template[2:4]}/{template}.mtx')
+        samples = _get_test_vector_set(pssm1, pssm2, x.shape[1]).astype(np.int32)
+        result, _ = model.nn_index(samples, num_neighbors=num_neighbors)
+        proba = np.array([np.count_nonzero(y[_])/num_neighbors for _ in result]).reshape((len(pssm1.pssm), len(pssm2.pssm)))
+        np.save(fname, proba)
 
 
 def _predict_by_rfc(args):  # args = [(px1, px2), ...]
