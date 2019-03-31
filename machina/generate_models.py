@@ -92,6 +92,8 @@ class BLASTModel:
         elif self.algo == 'deltablast':
             NcbideltablastCommandline(subject='subject.fasta', rpsdb=f'{self.blast_db_dir}/cdd_delta', evalue=99999,
                                       outfmt=5, out=f'{out_dir}/{query_id}/{target_id}.xml', query='query.fasta')()
+        Path('query.fasta').unlink()
+        Path('subject.fasta').unlink()
 
     def generate_protein_model(self, query: str, template: str, blast_xml_path: str, out_dir: str, template_dir: str):
         hits = [_ for _ in SearchIO.read(blast_xml_path, 'blast-xml').hits if _.id == template]
@@ -275,8 +277,6 @@ class HHSearchModel:
         ], pir_file, 'pir')
         arg = [self.modpysh, 'python3', Path(__file__).parent.resolve()/'modeller_script.py',
                pir_file, template, query, template_dir]
-        try:
-            subprocess.run(arg, stdout=subprocess.PIPE, stderr=subprocess.PIPE, universal_newlines=True, check=True)
-        except Exception as e:
-            print(e)
-            raise
+        results = subprocess.run(arg, stdout=subprocess.PIPE, stderr=subprocess.PIPE, universal_newlines=True, check=True)
+#         print(results.stdout)
+#         print(results.stderr)

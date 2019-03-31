@@ -13,7 +13,7 @@ logging.basicConfig(format='%(asctime)s [%(levelname)s] %(message)s', level=logg
 def modeller_automodel(pir_path, template_id, query_id, atom_files_dir):
     env = environ()
     env.io.atom_files_directory.append(atom_files_dir)
-    env.io.convert_modres = False
+    # env.io.convert_modres = False
 
     try:
         auto = automodel(env, alnfile=pir_path, knowns=[template_id], sequence=query_id)
