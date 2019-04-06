@@ -56,7 +56,7 @@ class MachinaModel:
 
     def generate_protein_model(self, query: str, template: str, alignments_list: str, out_dir: str, template_dir: str):
         aln = np.load(alignments_list)
-        best = aln[np.argmax([_[2] for _ in aln])]
+        best = aln[np.argmax([float(_[2]) for _ in aln])]
         pir_file = f'{out_dir}/{template}.pir'
         tseq = replace_missing_residues(best[1], f'{template_dir}/{template}.ent')
         Path(out_dir).mkdir(parents=True, exist_ok=True)
