@@ -1,0 +1,16 @@
+version: 2
+jobs:
+  build:
+    docker:
+      - image: python:3.6
+    steps:
+      - checkout
+      - run: pip install -r requirements.txt
+      - run:
+          name: Download SCOP
+          command: |
+            util/download_scop.sh
+            util/download_astral_seqres.sh
+      - run: pytest -v --cov . --pep8 --junitxml=test_reports/junit.xml
+      - store_test_results:
+          path: test_reports

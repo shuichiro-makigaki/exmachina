@@ -5,9 +5,11 @@ import itertools
 import csv
 import pickle
 from multiprocessing import Pool
+from concurrent.futures import ProcessPoolExecutor, as_completed
 import multiprocessing
 import shutil
 import os
+import random
 
 from Bio import SeqIO
 from Bio.Alphabet import generic_protein
@@ -25,7 +27,7 @@ AA = ['A', 'R', 'N', 'D', 'C', 'Q', 'E', 'G', 'H', 'I',
       'L', 'K', 'M', 'F', 'P', 'S', 'T', 'W', 'Y', 'V']
 # ToDo: Assert AA order in original PSSM file
 TMSCORE_THRESHOLD = 0.5
-WINDOW_WIDTH = 9
+WINDOW_WIDTH = 5
 WINDOW_CENTER = int(WINDOW_WIDTH / 2)
 USE_PADDING_LABEL = False
 PART_DIR = 'data/train/process_part'
@@ -174,7 +176,7 @@ def process(*args):
                         writer.writerow(list(v[0].reshape(WINDOW_WIDTH*20*2))+list([v[1]]))
 
 
-def create_scop40_dataset(window_size, tmscore_threshold, n_jobs=None):
+def create_scop40_dataset_old(window_size, tmscore_threshold, n_jobs=None):
     global WINDOW_WIDTH
     global WINDOW_CENTER
     global TMSCORE_THRESHOLD
@@ -199,45 +201,68 @@ def create_scop40_dataset(window_size, tmscore_threshold, n_jobs=None):
                              n_jobs))
 
 
-def get_training_data(sid1, sid2, window_size, tmscore_threshold):
-    global WINDOW_WIDTH
-    global WINDOW_CENTER
-    global TMSCORE_THRESHOLD
-    WINDOW_WIDTH = window_size
-    TMSCORE_THRESHOLD = tmscore_threshold
-    WINDOW_CENTER = int(WINDOW_WIDTH / 2)
-    tmalign = TMalignCommandLine(f'data/scop_e/{sid1[2:4]}/{sid1}.ent', f'data/scop_e/{sid2[2:4]}/{sid2}.ent')
-    tmalign.run()
-    if max(tmalign.tmscore) < TMSCORE_THRESHOLD:
-        return None, None
-    pssm1 = parse_pssm(f'data/pssm/{sid1[2:4]}/{sid1}.mtx')
-    pssm2 = parse_pssm(f'data/pssm/{sid2[2:4]}/{sid2}.mtx')
-    msa = parse_alignment(sid1, sid2)
+def process2(msa: MultipleSeqAlignment, pssm1: PSSM, pssm2: PSSM, ratio: float):
+    assert len(pssm1.pssm) == len(msa[0].seq.ungap('-'))
+    assert len(pssm2.pssm) == len(msa[1].seq.ungap('-'))
     recs, _ = create_dataset(pssm1, pssm2, msa)
-    X, Y = [], []
+    results = []
     for r in recs:
         for x, y in itertools.product(range(WINDOW_WIDTH), range(WINDOW_WIDTH)):
             v = r[x][y]
             if v:
-                X.append(list(v[0].reshape(WINDOW_WIDTH*20*2)))
-                Y.append([int(v[1])])
-    return np.array(X, dtype=np.int8), np.array(Y, dtype=np.int8)
+                if random.random() <= ratio:
+                    results.append(list(v[0].reshape(WINDOW_WIDTH*len(AA)*2))+list([v[1]]))
+    return np.array(results, dtype=np.int8)
 
 
-def get_validation_data(sid1, sid2, db_index, window_size, tmscore_threshold):
-    global WINDOW_WIDTH
-    global WINDOW_CENTER
-    global TMSCORE_THRESHOLD
-    WINDOW_WIDTH = window_size
-    TMSCORE_THRESHOLD = tmscore_threshold
-    WINDOW_CENTER = int(WINDOW_WIDTH / 2)
-    tmalign = TMalignCommandLine(f'data/scop_e/{sid1[2:4]}/{sid1}.ent', f'data/scop_e/{sid2[2:4]}/{sid2}.ent')
-    tmalign.run()
-    if max(tmalign.tmscore) < TMSCORE_THRESHOLD:
-        return None, None
-    pssm1 = parse_pssm(f'data/pssm/{sid1[2:4]}/{sid1}.mtx')
-    pssm2 = parse_pssm(f'data/pssm/{sid2[2:4]}/{sid2}.mtx')
-    msa = parse_alignment(sid1, sid2, db_index)
+def create_scop40_dataset(structural_alignments_path: str, pssm_dir: str,
+                          out_path: str, ratio: float, masked_ids: list):
+    aligns = SeqIO.index(structural_alignments_path, 'fasta')
+    finished = []
+    with ProcessPoolExecutor() as executor:
+        futures = []
+        for seq_id in tqdm(aligns):
+            if float(aligns[seq_id].description.split('=')[1]) < TMSCORE_THRESHOLD:
+                continue
+            dom1, dom2 = seq_id.split('&')[:2]
+            if dom1 in masked_ids or dom2 in masked_ids:
+                continue
+            if (dom1, dom2) in finished:
+                continue
+            futures.append(
+                executor.submit(process2,
+                                MultipleSeqAlignment([aligns[f'{dom1}&{dom2}'], aligns[f'{dom2}&{dom1}']]),
+                                parse_pssm(f'{pssm_dir}/{dom1[2:4]}/{dom1}.mtx'),
+                                parse_pssm(f'{pssm_dir}/{dom2[2:4]}/{dom2}.mtx'),
+                                ratio))
+            finished.append((dom1, dom2))
+            finished.append((dom2, dom1))
+        results = []
+        for future in as_completed(futures):
+            results.extend(future.result())
+        results = np.array(results, dtype=np.int8)
+        np.save(out_path, results)
+        logging.info(f'Training data shape={results.shape}')
+
+
+def split_data_label(sample_path: str, out_x_path: str, out_y_path: str):
+    samples = np.load(sample_path)
+    i = 0
+    x = np.empty((samples.shape[0], samples.shape[1]-1), dtype=np.int8)
+    y = np.empty(samples.shape[0], dtype=np.int8)
+    for v in tqdm(samples):
+        x[i, :] = v[:-1]
+        y[i] = v[-1]
+        i += 1
+    np.save(out_x_path, x)
+    np.save(out_y_path, y)
+
+
+def get_validation_label(domain_sid1: str, domain_sid2: str, aligns, pssm_dir: str):
+    pssm1 = parse_pssm(f'{pssm_dir}/{domain_sid1[2:4]}/{domain_sid1}.mtx')
+    pssm2 = parse_pssm(f'{pssm_dir}/{domain_sid2[2:4]}/{domain_sid2}.mtx')
+    msa = MultipleSeqAlignment([aligns[f'{domain_sid1}&{domain_sid2}'], aligns[f'{domain_sid2}&{domain_sid1}']])
+    assert len(pssm1.pssm) == len(msa[0].seq.ungap('-')) and len(pssm2.pssm) == len(msa[1].seq.ungap('-'))
     Y = np.zeros((len(pssm1.pssm), len(pssm2.pssm)), dtype=np.int8)
     x, y = 0, 0
     for i in range(msa.get_alignment_length()):
@@ -249,10 +274,5 @@ def get_validation_data(sid1, sid2, db_index, window_size, tmscore_threshold):
             Y[x, y] = 1
             x += 1
             y += 1
-    X = np.empty((len(pssm1.pssm)*len(pssm2.pssm), WINDOW_WIDTH*20*2), dtype=np.int8)
-    i = 0
-    for x1, x2 in itertools.product(range(len(pssm1.pssm)), range(len(pssm2.pssm))):
-        vec1, vec2 = get_feature_vector(pssm1, pssm2, x1, x2)
-        X[i, :] = np.array(list(vec1) + list(vec2), dtype=np.int8)
-        i += 1
-    return X, Y
+    
+    return Y

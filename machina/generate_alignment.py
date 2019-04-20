@@ -1,4 +1,3 @@
-import logging
 from pathlib import Path
 import re
 
@@ -8,8 +7,6 @@ from Bio.Alphabet import generic_protein
 from Bio.SubsMat import MatrixInfo
 
 from machina.pairwise2 import align
-
-logging.basicConfig(format='%(asctime)s [%(levelname)s] %(message)s', level=logging.INFO)
 
 BLOSUM_MODE = 'off'
 
@@ -46,24 +43,11 @@ def _pp(path):
     return Seq(''.join(seq), generic_protein)
 
 
-def local_alignment(path, gapopen, gapextend):
-    domain_id = path.stem
-    seq_b = str(_pp(f'data/pssm/{domain_id[2:4]}/{domain_id}.mtx'))
-    domain_id = path.parts[-2]
-    seq_a = str(_pp(f'data/pssm/{domain_id[2:4]}/{domain_id}.mtx'))
-    try:
-        matrix = np.load(path.as_posix())
-        ali = align.localcs(seq_a, seq_b, _my_match(matrix.tolist()), gapopen, gapextend, force_generic=True)
-    except Exception as e:
-        logging.error(" ")
-        logging.exception(e)
-        logging.error(path)
-        logging.error(seq_a)
-        logging.error(seq_b)
-        ali = None
-    return ali
-
-
-def generate_alignment(path, gap_open, gap_extend):
-    ali = local_alignment(path, gapopen=gap_open, gapextend=gap_extend)
-    return {path.stem: ali}
+def alignment_local(score_matrix_path: str, domain_sid1: str, domain_sid2: str,
+                    pssm_dir: str, gap_open: float, gap_extend: float):
+    seq_a = str(_pp(f'{pssm_dir}/{domain_sid1[2:4]}/{domain_sid1}.mtx'))
+    seq_b = str(_pp(f'{pssm_dir}/{domain_sid2[2:4]}/{domain_sid2}.mtx'))
+    matrix = np.load(score_matrix_path)
+    assert len(seq_a) == matrix.shape[0] and len(seq_b) == matrix.shape[1]
+    ali = align.localcs(seq_a, seq_b, _my_match(matrix.tolist()), gap_open, gap_extend, force_generic=True)
+    return (domain_sid1, domain_sid2), ali
