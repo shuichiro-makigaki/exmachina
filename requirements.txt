@@ -8,13 +8,7 @@ scipy
 numpy
 tqdm
 more_itertools
-jupyter
-jupyter_contrib_nbextensions
-jupyter-js-widgets-nbextension
 nglview
-tensorflow
-keras
 seaborn
-ipyparallel
 dvc[all]
 jupyterlab

@@ -12,7 +12,6 @@ import numpy as np
 from tqdm import tqdm
 from sklearn.neighbors import KNeighborsClassifier
 import pyflann
-# from keras.models import load_model
 
 
 logging.basicConfig(format='%(asctime)s [%(levelname)s] %(message)s', level=logging.INFO)
@@ -23,9 +22,6 @@ AA = ['A', 'R', 'N', 'D', 'C', 'Q', 'E', 'G', 'H', 'I',
 WINDOW_WIDTH = 5
 WINDOW_CENTER = int(WINDOW_WIDTH / 2)
 USE_PADDING_LABEL = False
-# MODEL_NAME = 'NN_scop40_tmscore50_w9_downsampling_ep20_ba512'
-# MODEL_NAME = 'NN_scop40_tmscore50_w9_downsampling_ep20_ba1024'
-MODEL_NAME = 'NN_scop40_tmscore50_w9_downsampling_ep20_ba2048'
 
 
 def get_feature_vector(pssm1, pssm2, pos1, pos2):
@@ -170,81 +166,10 @@ def predict_by_flann(x_path: str, y_path: str, model_path: str, num_neighbors: i
         np.save(fname, proba)
 
 
-def _predict_by_rfc(args):  # args = [(px1, px2), ...]
-    Path(f'data/prediction/{MODEL_NAME}').mkdir(exist_ok=True)
-    model_file = Path(f'data/models/{MODEL_NAME}.pkl')
-    model = joblib.load(model_file)
-    model.verbose = False
-    for arg in args:
-        px1, px2 = arg[0], arg[1]
-        pred_dir = Path(f'data/prediction/{MODEL_NAME}/{px1}')
-        pred_dir.mkdir(exist_ok=True)
-        fname = pred_dir/f'{px2}.npy'
-        if fname.exists():
-            logging.debug(f'{fname} already exists. Skipping.')
-            continue
-        if px2.find('.') > -1:
-            logging.debug(f'Ignore {px2}')
-            continue
-        try:
-            pssm1 = parse_pssm(f'data/pssm/{px1[2:4]}/{px1}.mtx')
-            pssm2 = parse_pssm(f'data/pssm/{px2[2:4]}/{px2}.mtx')
-            tests = _get_test_vector_set(pssm1, pssm2)
-            proba = model.predict_proba(tests)[:, 1].reshape((len(pssm1.pssm), len(pssm2.pssm)))
-        except Exception as e:
-            logging.error(arg)
-            logging.exception(e)
-            continue
-        np.save(fname, proba)
-
-
-def predict_by_rfc(n_jobs, args):  # args = [(px1, px2), ...]
-    args = more_itertools.chunked(args, int(len(args)/n_jobs))
-    with ProcessPoolExecutor(max_workers=n_jobs) as executor:
-        [_ for _ in list(executor.map(_predict_by_rfc, args))]
-
-
-def _predict_by_nn(args):  # args = [(px1, px2), ...]
-    Path(f'data/prediction/{MODEL_NAME}').mkdir(exist_ok=True)
-    model = load_model(Path(f'data/models/{MODEL_NAME}.h5'))
-    for arg in tqdm(args):
-        px1, px2 = arg[0], arg[1]
-        pred_dir = Path(f'data/prediction/{MODEL_NAME}/{px1}')
-        pred_dir.mkdir(exist_ok=True)
-        fname = pred_dir/f'{px2}.npy'
-        if fname.exists():
-            logging.debug(f'{fname} already exists. Skipping.')
-            continue
-        if px2.find('.') > -1:
-            logging.debug(f'Ignore {px2}')
-            continue
-        try:
-            pssm1 = parse_pssm(f'data/pssm/{px1[2:4]}/{px1}.mtx')
-            pssm2 = parse_pssm(f'data/pssm/{px2[2:4]}/{px2}.mtx')
-            tests = _get_test_vector_set(pssm1, pssm2, 360)
-            proba = model.predict(tests)
-            proba = proba[:, 0].reshape((len(pssm1.pssm), len(pssm2.pssm)))
-        except Exception as e:
-            logging.error(arg)
-            logging.exception(e)
-            continue
-        np.save(fname, proba)
-
-
-def predict_by_nn(n_jobs, args):  # args = [(px1, px2), ...]
-    args = more_itertools.chunked(args, int(len(args)/n_jobs))
-    with ProcessPoolExecutor(max_workers=n_jobs) as executor:
-        [_ for _ in list(executor.map(_predict_by_nn, args))]
-
-
-def predict_scores(query, template):
-    args = [(query, template)]
-    x = np.load('data/train/scop40_logscore_tmscore50_w5_randomsampling_ratio0.1_x.npy')
-    y = np.load('data/train/scop40_logscore_tmscore50_w5_randomsampling_ratio0.1_y.npy')
-    knn_index_name = 'flann19_scop40_logscore_tmscore50_w5_randomsampling_ratio0.1'
-    dim = 200
-    nn = 1000
-    predict_by_flann(x, y, dim, knn_index_name, nn, args)
+def predict_scores(query, template, pssm_dir='pssm', out_dir='results'):
+    predict_by_flann('data/train/scop40_logscore_tmscore50_w5_randomsampling_ratio0.1_x.npy',
+                     'data/train/scop40_logscore_tmscore50_w5_randomsampling_ratio0.1_y.npy',
+                     'data/train/flann19_scop40_logscore_tmscore0.5_window5_ratio0.1',
+                     1000, out_dir, pssm_dir, [(query, template)])
     logging.info('')
-    logging.info('Result is saved into:')
-    logging.info(f'data/prediction/{knn_index_name}_nn{nn}/{query}/{template}.npy')
+    logging.info(f'Result is saved into: {out_dir}/{query}/{template}.npy')
