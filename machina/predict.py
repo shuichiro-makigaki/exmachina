@@ -167,8 +167,8 @@ def predict_by_flann(x_path: str, y_path: str, model_path: str, num_neighbors: i
 
 
 def predict_scores(query, template, pssm_dir='pssm', out_dir='results'):
-    predict_by_flann('data/train/scop40_logscore_tmscore50_w5_randomsampling_ratio0.1_x.npy',
-                     'data/train/scop40_logscore_tmscore50_w5_randomsampling_ratio0.1_y.npy',
+    predict_by_flann('data/train/scop40_logscore_tmscore0.5_window5_ratio0.1_x.npy',
+                     'data/train/scop40_logscore_tmscore0.5_window5_ratio0.1_y.npy',
                      'data/train/flann19_scop40_logscore_tmscore0.5_window5_ratio0.1',
                      1000, out_dir, pssm_dir, [(query, template)])
     logging.info('')
