@@ -1,6 +1,6 @@
-workflow "pytest" {
+workflow "main" {
   on = "push"
-  resolves = ["docker://python:3."]
+  resolves = ["pytest"]
 }
 
 action "pip install" {
@@ -8,8 +8,8 @@ action "pip install" {
   args = "pip install --user -r requirements.txt"
 }
 
-action "docker://python:3." {
+action "pytest" {
   uses = "docker://python:3.6"
   needs = ["pip install"]
-  args = "pytest -v --cov . --pep8 --junitxml=test_reports/junit.xml"
+  args = "/github/home/.local/bin/pytest -v --cov . --pep8 --junitxml=test_reports/junit.xml"
 }
