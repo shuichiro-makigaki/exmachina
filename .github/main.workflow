@@ -11,5 +11,5 @@ action "Filters for GitHub Actions" {
 action "actions/bin/sh@master" {
   uses = "actions/bin/sh@master"
   needs = ["Filters for GitHub Actions"]
-  args = "ls -al"
+  args = ["ls -al", "pwd", "export"]
 }
