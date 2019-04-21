@@ -1,6 +1,6 @@
 workflow "pytest" {
   on = "push"
-  resolves = ["actions/bin/sh@master"]
+  resolves = ["docker://python:3.6"]
 }
 
 action "Filters for GitHub Actions" {
@@ -8,8 +8,8 @@ action "Filters for GitHub Actions" {
   args = "pip install --user -r requirements.txt"
 }
 
-action "actions/bin/sh@master" {
-  uses = "actions/bin/sh@master"
+action "docker://python:3.6" {
+  uses = "docker://python:3.6"
   needs = ["Filters for GitHub Actions"]
-  args = ["ls -al", "pwd", "export"]
+  args = "pip list"
 }
