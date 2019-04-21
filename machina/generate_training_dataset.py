@@ -274,5 +274,5 @@ def get_validation_label(domain_sid1: str, domain_sid2: str, aligns, pssm_dir: s
             Y[x, y] = 1
             x += 1
             y += 1
-    
+
     return Y
