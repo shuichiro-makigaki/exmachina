@@ -20,6 +20,7 @@ AA = ['A', 'R', 'N', 'D', 'C', 'Q', 'E', 'G', 'H', 'I',
 WINDOW_WIDTH = 5
 WINDOW_CENTER = int(WINDOW_WIDTH / 2)
 USE_PADDING_LABEL = False
+LENGTH_RATIO = 1/2
 
 
 def get_feature_vector(pssm1, pssm2, pos1, pos2):
@@ -80,9 +81,17 @@ def get_labels(msa):
 
 
 def _get_test_vector_set(pssm1: PSSM, pssm2: PSSM, n_features=202):
-    tests = np.empty((len(pssm1.pssm)*len(pssm2.pssm), n_features))
+    # Explicitly count the number of feature vectors
     i = 0
     for x1, x2 in itertools.product(range(len(pssm1.pssm)), range(len(pssm2.pssm))):
+        if x1 > int(len(pssm1.pssm)*LENGTH_RATIO) + x2 or x2 > int(len(pssm2.pssm)*LENGTH_RATIO) + x1:
+            continue
+        i += 1
+    tests = np.empty((i, n_features))
+    i = 0
+    for x1, x2 in itertools.product(range(len(pssm1.pssm)), range(len(pssm2.pssm))):
+        if x1 > int(len(pssm1.pssm)*LENGTH_RATIO) + x2 or x2 > int(len(pssm2.pssm)*LENGTH_RATIO) + x1:
+            continue
         vec1, vec2 = get_feature_vector(pssm1, pssm2, x1, x2)
         tests[i, :] = np.array(list(vec1) + list(vec2))
         i += 1
@@ -160,7 +169,13 @@ def predict_by_flann_batch(x_path: str, y_path: str, model_path: str, num_neighb
         pssm2 = parse_pssm(f'{pssm_dir}/{template[2:4]}/{template}.mtx')
         samples = _get_test_vector_set(pssm1, pssm2, x.shape[1]).astype(np.int32)
         result, _ = model.nn_index(samples, num_neighbors=num_neighbors)
-        proba = np.array([np.count_nonzero(y[_])/num_neighbors for _ in result]).reshape((len(pssm1.pssm), len(pssm2.pssm)))
+        proba = np.full((len(pssm1.pssm), len(pssm2.pssm)), -1.0)
+        i = 0
+        for x1, x2 in itertools.product(range(len(pssm1.pssm)), range(len(pssm2.pssm))):
+            if x1 > int(len(pssm1.pssm)*LENGTH_RATIO) + x2 or x2 > int(len(pssm2.pssm)*LENGTH_RATIO) + x1:
+                continue
+            proba[x1, x2] = np.count_nonzero(y[result[i]]) / num_neighbors
+            i += 1
         np.save(fname, proba)
 
 
@@ -173,8 +188,13 @@ def predict_by_flann(x_path: Path, y_path: Path, model_path: Path, num_neighbors
     pssm2 = parse_pssm(template)
     samples = _get_test_vector_set(pssm1, pssm2, x.shape[1]).astype(np.int32)
     result, _ = model.nn_index(samples, num_neighbors=num_neighbors)
-    proba = np.array(
-        [np.count_nonzero(y[_])/num_neighbors for _ in result]).reshape((len(pssm1.pssm), len(pssm2.pssm)))
+    proba = np.full((len(pssm1.pssm), len(pssm2.pssm)), -1.0)
+    i = 0
+    for x1, x2 in itertools.product(range(len(pssm1.pssm)), range(len(pssm2.pssm))):
+        if x1 > int(len(pssm1.pssm) * LENGTH_RATIO) + x2 or x2 > int(len(pssm2.pssm) * LENGTH_RATIO) + x1:
+            continue
+        proba[x1, x2] = np.count_nonzero(y[result[i]]) / num_neighbors
+        i += 1
     out_path.parent.mkdir(exist_ok=True, parents=True)
     np.save(out_path.as_posix(), proba)
 
