@@ -20,7 +20,7 @@ AA = ['A', 'R', 'N', 'D', 'C', 'Q', 'E', 'G', 'H', 'I',
 WINDOW_WIDTH = 5
 WINDOW_CENTER = int(WINDOW_WIDTH / 2)
 USE_PADDING_LABEL = False
-LENGTH_RATIO = 2/3
+LENGTH_RATIO = 1/2
 
 
 def get_feature_vector(pssm1, pssm2, pos1, pos2):
@@ -174,7 +174,7 @@ def predict_by_flann(x_path: str, y_path: str, model_path: str, num_neighbors: i
         for x1, x2 in itertools.product(range(len(pssm1.pssm)), range(len(pssm2.pssm))):
             if x1 > int(len(pssm1.pssm)*LENGTH_RATIO) + x2 or x2 > int(len(pssm2.pssm)*LENGTH_RATIO) + x1:
                 continue
-            proba[x1, x2] = np.count_nonzero(result[i]) / num_neighbors
+            proba[x1, x2] = np.count_nonzero(y[result[i]]) / num_neighbors
             i += 1
         np.save(fname, proba)
 
