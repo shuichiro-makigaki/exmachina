@@ -51,23 +51,26 @@ def _pp(path):
 
 
 class MachinaModel:
-    def __init__(self, modpy_sh_path='/opt/modeller-9.20/bin/modpy.sh'):
-        self.modpysh = modpy_sh_path
+    def __init__(self, mod_bin):
+        self.mod_bin = mod_bin
 
-    def generate_protein_model(self, query: str, template: str, alignments_list: str, out_dir: str, template_dir: str):
+    def generate_protein_model(self, query: Path, template: Path, chain: str,
+                               alignments_list: Path, template_dir: Path, out_dir: Path):
         aln = np.load(alignments_list)
         best = aln[np.argmax([float(_[2]) for _ in aln])]
-        pir_file = f'{out_dir}/{template}.pir'
-        tseq = replace_missing_residues(best[1], f'{template_dir}/{template}.ent')
+        pir_file = out_dir/'alignment.pir'
+        tseq = replace_missing_residues(best[1], f'{template_dir}/{template.stem}.ent')
         Path(out_dir).mkdir(parents=True, exist_ok=True)
         SeqIO.write([
-            SeqRecord(Seq(best[0], generic_protein), id=query, name='', description=f'sequence:{query}::::::::'),
-            SeqRecord(Seq(tseq, generic_protein), id=template, name='',
-                      description=f'structureX:{template}::{template[5].upper()}::{template[5].upper()}::::')
+            SeqRecord(Seq(best[0], generic_protein), id=query.stem, name='',
+                      description=f'sequence:{query.stem}::::::::'),
+            SeqRecord(
+                Seq(tseq, generic_protein), id=template.stem, name='',
+                description=f'structureX:{template.stem}::{chain}::{chain}::::')
         ], pir_file, 'pir')
-        arg = [self.modpysh, 'python3', Path(__file__).parent.resolve()/'modeller_script.py',
-               pir_file, template, query, template_dir]
-        subprocess.run(arg, stdout=subprocess.PIPE, stderr=subprocess.PIPE, universal_newlines=True)
+        arg = [self.mod_bin, Path(__file__).parent.resolve()/'modeller_script.py',
+               pir_file.resolve(), query.stem, template.stem, template_dir.resolve()]
+        subprocess.run(arg, stdout=subprocess.PIPE, stderr=subprocess.PIPE, universal_newlines=True, cwd=out_dir)
 
 
 class BLASTModel:

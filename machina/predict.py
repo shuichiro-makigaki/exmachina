@@ -3,10 +3,8 @@ import logging
 import itertools
 import re
 import os
-from concurrent.futures import ProcessPoolExecutor
-import more_itertools
 
-from sklearn.externals import joblib
+import joblib
 from Bio.Align.AlignInfo import PSSM
 import numpy as np
 from tqdm import tqdm
@@ -146,7 +144,7 @@ def predict_by_flann_old(x, y, dim, model_name, num_neighbors, args):  # args = 
         np.save(fname, proba)
 
 
-def predict_by_flann(x_path: str, y_path: str, model_path: str, num_neighbors: int, out_dir: str, pssm_dir: str, args):
+def predict_by_flann_batch(x_path: str, y_path: str, model_path: str, num_neighbors: int, out_dir: str, pssm_dir: str, args):
     x = np.load(x_path).astype(np.int32)
     y = np.load(y_path)
     model = pyflann.FLANN()
@@ -166,10 +164,32 @@ def predict_by_flann(x_path: str, y_path: str, model_path: str, num_neighbors: i
         np.save(fname, proba)
 
 
-def predict_scores(query, template, pssm_dir='pssm', out_dir='results'):
-    predict_by_flann('data/train/scop40_logscore_tmscore0.5_window5_ratio0.1_x.npy',
-                     'data/train/scop40_logscore_tmscore0.5_window5_ratio0.1_y.npy',
-                     'data/train/flann19_scop40_logscore_tmscore0.5_window5_ratio0.1',
-                     1000, out_dir, pssm_dir, [(query, template)])
-    logging.info('')
-    logging.info(f'Result is saved into: {out_dir}/{query}/{template}.npy')
+def predict_by_flann(x_path: Path, y_path: Path, model_path: Path, num_neighbors: int, out_path: Path, query: Path, template: Path):
+    x = np.load(x_path).astype(np.int32)
+    y = np.load(y_path)
+    model = pyflann.FLANN()
+    model.load_index(model_path.as_posix(), x)
+    pssm1 = parse_pssm(query)
+    pssm2 = parse_pssm(template)
+    samples = _get_test_vector_set(pssm1, pssm2, x.shape[1]).astype(np.int32)
+    result, _ = model.nn_index(samples, num_neighbors=num_neighbors)
+    proba = np.array(
+        [np.count_nonzero(y[_])/num_neighbors for _ in result]).reshape((len(pssm1.pssm), len(pssm2.pssm)))
+    out_path.parent.mkdir(exist_ok=True, parents=True)
+    np.save(out_path.as_posix(), proba)
+
+
+def predict_scores(query: Path, template: Path,
+                   flann_x=Path('scop40_logscore_tmscore0.5_window5_ratio0.1_x.npy'),
+                   flann_y=Path('scop40_logscore_tmscore0.5_window5_ratio0.1_y.npy'),
+                   flann_index=Path('flann19_scop40_logscore_tmscore0.5_window5_ratio0.1'),
+                   num_neighbors=1000,
+                   out_dir=Path('results'),
+                   out_name=Path('score.npy')):
+    out_path = out_dir / out_name
+    if out_path.exists():
+        logging.warning(f'Result already exists: {out_path}')
+        logging.warning('Do nothing')
+    else:
+        predict_by_flann(flann_x, flann_y, flann_index, num_neighbors, out_path, query, template)
+        logging.info(f'Result is saved into: {out_path}')

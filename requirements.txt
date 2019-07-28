@@ -12,3 +12,7 @@ nglview
 seaborn
 dvc[all]
 jupyterlab
+nbdime
+jupyterlab_git
+click
+joblib
