@@ -10,7 +10,7 @@ tqdm
 more_itertools
 nglview
 seaborn
-dvc[all]
+dvc[s3,ssh]
 jupyterlab
 nbdime
 jupyterlab_git

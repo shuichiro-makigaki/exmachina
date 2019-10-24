@@ -1,6 +1,8 @@
-['remote "tsubame"']
-url = ssh://16D38098@login.t3.gsic.titech.ac.jp:/gs/hs0/tga-ishidalab/makigaki/dvc-cache/machina/data
-[core]
-remote = s3
 ['remote "s3"']
 url = s3://exmachina-data/dvc-cache
+['remote "origin"']
+url = ssh://makigaki@gw1.cb.cs.titech.ac.jp/home/makigaki/public_html/machina/dvc-cache
+[core]
+remote = default
+['remote "default"']
+url = http://www.cb.cs.titech.ac.jp/~makigaki/machina/dvc-cache

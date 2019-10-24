@@ -1,2 +1,5 @@
 /data/train/pdbstyle-1.75/
 /data/train/pssm/
+/data/evaluation/
+/data/results/
+/data/prediction/
