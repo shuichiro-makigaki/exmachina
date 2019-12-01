@@ -28,13 +28,13 @@ We propose a new method that generates pairwise sequence alignments for more acc
 
 ## Prepare
 
-### 1. Install requirements
+Install requirements:
 
 ```shell script
 pip3 install -r requirements.txt
 ```
 
-We also needs FLANN and the Python binding.
+We also needs FLANN [1] and the Python binding.
 
 ```shell script
 git clone https://github.com/mariusmuja/flann
@@ -60,22 +60,12 @@ COMMAND ${PYTHON_EXECUTABLE} ${CMAKE_CURRENT_BINARY_DIR}/setup.py install
 COMMAND ${PYTHON_EXECUTABLE} ${CMAKE_CURRENT_BINARY_DIR}/setup.py install --user
 ```
 
-### 2. Download <i>k</i>NN index tree and training data
+##  Open and read example.ipynb for further
 
-This consumes 24GB RAM.
+# Supplementary Data
 
-```bash
-wget http://www.cb.cs.titech.ac.jp/~makigaki/machina/data/train/flann19_scop40_logscore_tmscore0.5_window5_ratio0.1
-wget http://www.cb.cs.titech.ac.jp/~makigaki/machina/data/train/scop40_logscore_tmscore0.5_window5_ratio0.1_x.npy
-wget http://www.cb.cs.titech.ac.jp/~makigaki/machina/data/train/scop40_logscore_tmscore0.5_window5_ratio0.1_y.npy
-```
+Data used for kNN index and the paper is availble by `dvc pull data.dvc`, which requires 140GB disk space.
 
-The smaller dataset is available for test.
+# References
 
-```bash
-wget http://www.cb.cs.titech.ac.jp/~makigaki/machina/data/train/flann19_scop40_logscore_tmscore0.5_window5_ratio0.01
-wget http://www.cb.cs.titech.ac.jp/~makigaki/machina/data/train/scop40_logscore_tmscore0.5_window5_ratio0.01_x.npy
-wget http://www.cb.cs.titech.ac.jp/~makigaki/machina/data/train/scop40_logscore_tmscore0.5_window5_ratio0.01_y.npy
-```
-
-### 3. Open example.ipynb in Jupyter Lab.
+1. Marius Muja and David G. Lowe, "Fast Approximate Nearest Neighbors with Automatic Algorithm Configuration", in <i>International Conference on Computer Vision Theory and Applications (VISAPP'09)</i>, 2009
