@@ -26,7 +26,15 @@ We propose a new method that generates pairwise sequence alignments for more acc
 * Linux (recommended) and macOS X
 * Python **>=3.6**
 
-## Prepare
+## How to use
+
+Open and read `example.ipynb`.
+
+### Available in Docker
+
+![Docker Cloud Build Status](https://img.shields.io/docker/cloud/build/makisyu/exmachina)
+
+### Build from source
 
 Install requirements:
 
@@ -60,12 +68,10 @@ COMMAND ${PYTHON_EXECUTABLE} ${CMAKE_CURRENT_BINARY_DIR}/setup.py install
 COMMAND ${PYTHON_EXECUTABLE} ${CMAKE_CURRENT_BINARY_DIR}/setup.py install --user
 ```
 
-##  Open and read example.ipynb for further
-
-# Supplementary Data
+## Supplementary Data
 
 Data used for kNN index and the paper is availble by `dvc pull data.dvc`, which requires 140GB disk space.
 
-# References
+## References
 
 1. Marius Muja and David G. Lowe, "Fast Approximate Nearest Neighbors with Automatic Algorithm Configuration", in <i>International Conference on Computer Vision Theory and Applications (VISAPP'09)</i>, 2009
