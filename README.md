@@ -26,15 +26,23 @@ We propose a new method that generates pairwise sequence alignments for more acc
 * Linux (recommended) and macOS X
 * Python **>=3.6**
 
-## Prepare
+## How to use
 
-### 1. Install requirements
+Open and read `example.ipynb`.
+
+### Available in Docker
+
+![Docker Cloud Build Status](https://img.shields.io/docker/cloud/build/makisyu/exmachina)
+
+### Build from source
+
+Install requirements:
 
 ```shell script
 pip3 install -r requirements.txt
 ```
 
-We also need FLANN and Python binding.
+We also need FLANN [1] and Python binding.
 
 ```shell script
 git clone https://github.com/mariusmuja/flann
@@ -60,22 +68,10 @@ COMMAND ${PYTHON_EXECUTABLE} ${CMAKE_CURRENT_BINARY_DIR}/setup.py install
 COMMAND ${PYTHON_EXECUTABLE} ${CMAKE_CURRENT_BINARY_DIR}/setup.py install --user
 ```
 
-### 2. Download <i>k</i>NN index tree and training data
+## Supplementary Data
 
-This consumes 24GB RAM.
+Data used for the kNN index and the paper is available by `dvc pull data.dvc`, which requires 140GB disk space.
 
-```bash
-wget http://www.cb.cs.titech.ac.jp/~makigaki/machina/data/train/flann19_scop40_logscore_tmscore0.5_window5_ratio0.1
-wget http://www.cb.cs.titech.ac.jp/~makigaki/machina/data/train/scop40_logscore_tmscore0.5_window5_ratio0.1_x.npy
-wget http://www.cb.cs.titech.ac.jp/~makigaki/machina/data/train/scop40_logscore_tmscore0.5_window5_ratio0.1_y.npy
-```
+## References
 
-The smaller dataset is available for test.
-
-```bash
-wget http://www.cb.cs.titech.ac.jp/~makigaki/machina/data/train/flann19_scop40_logscore_tmscore0.5_window5_ratio0.01
-wget http://www.cb.cs.titech.ac.jp/~makigaki/machina/data/train/scop40_logscore_tmscore0.5_window5_ratio0.01_x.npy
-wget http://www.cb.cs.titech.ac.jp/~makigaki/machina/data/train/scop40_logscore_tmscore0.5_window5_ratio0.01_y.npy
-```
-
-### 3. Open example.ipynb in Jupyter Lab.
+1. Marius Muja and David G. Lowe, "Fast Approximate Nearest Neighbors with Automatic Algorithm Configuration", in <i>International Conference on Computer Vision Theory and Applications (VISAPP'09)</i>, 2009
