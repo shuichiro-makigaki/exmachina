@@ -34,7 +34,7 @@ We propose a new method that generates pairwise sequence alignments for more acc
 pip3 install -r requirements.txt
 ```
 
-We also needs FLANN and the Python binding.
+We also need FLANN and Python binding.
 
 ```shell script
 git clone https://github.com/mariusmuja/flann
@@ -44,9 +44,9 @@ cd flann
 # git checkout 033b05b1 -b clang
 mkdir build
 cd build
-### PYTHON_EXECUTABLE:FILEPATH and CMAKE_INSTALL_PREFIX
-### should follow your environment 
-cmake -DCMAKE_INSTALL_PREFIX=~/.local -DPYTHON_EXECUTABLE:FILEPATH=/usr/local/bin/python3 ..
+### PYTHON_EXECUTABLE:FILEPATH and CMAKE_INSTALL_PREFIX should follow your environment.
+### liblz4 is required.
+cmake -DCMAKE_INSTALL_PREFIX=~/.local -DPYTHON_EXECUTABLE:FILEPATH=$(which python3) ..
 make
 make install
 ```
