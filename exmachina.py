@@ -121,5 +121,64 @@ def download_knn_model():
     pass
 
 
+@main.command(help='Run')
+@click.option('--query', type=click.Path(exists=True), required=True, help='Query sequence file')
+@click.option('--template', type=click.Path(exists=True), required=True, help='Template sequence file')
+@click.option('--blastdb', type=click.STRING, default='uniref90', show_default=True, help='BLAST database')
+@click.option('--num-iterations', type=click.INT, default=3, show_default=True, help='Iterations of PSI-BLAST')
+@click.option('--num-threads', type=click.INT, default=1, show_default=True, help='Multi-threading')
+@click.option('--out-dir', type=click.Path(), default='results', show_default=True, help='Output directory')
+@click.option('--flann-x', type=click.Path(exists=True), show_default=True,
+              default='scop40_logscore_tmscore0.5_window5_ratio0.1_x.npy',
+              help='Sample data file of FLANN')
+@click.option('--flann-y', type=click.Path(exists=True), show_default=True,
+              default='scop40_logscore_tmscore0.5_window5_ratio0.1_y.npy',
+              help='Sample label file of FLANN')
+@click.option('--flann-index', type=click.Path(exists=True), show_default=True,
+              default='flann19_scop40_logscore_tmscore0.5_window5_ratio0.1',
+              help='Index file of FLANN')
+@click.option('--num-neighbors', type=int, default=1000, show_default=True,
+              help='Number of neighbors for kNN')
+@click.option('--score-out-name', type=click.Path(), default='score.npy', show_default=True,
+              help='Output file name in --out-dir')
+@click.option('--score-matrix', type=click.Path(), default='score.npy', show_default=True,
+              help='Predicted score matrix')
+@click.option('--open-penalty', type=click.FLOAT, default=0.1, show_default=True,
+              help='Smith-Waterman gap-open penalty')
+@click.option('--extend-penalty', type=click.FLOAT, default=0.0001, show_default=True,
+              help='Smith-Waterman gap-extend penalty')
+@click.option('--alignment-out-name', type=click.Path(), default='alignments.npy', show_default=True,
+              help='Output file name in --out-dir')
+def run_all(out_dir, query, blastdb, num_iterations, num_threads, template,
+            flann_x, flann_y, flann_index, num_neighbors, score_out_name,
+            score_matrix, open_penalty, extend_penalty, alignment_out_name):
+    _run_all(out_dir, query, blastdb, num_iterations, num_threads, template,
+             flann_x, flann_y, flann_index, num_neighbors, score_out_name,
+             score_matrix, open_penalty, extend_penalty, alignment_out_name)
+
+def _run_all(out_dir, query, blastdb, num_iterations, num_threads, template,
+             flann_x, flann_y, flann_index, num_neighbors, score_out_name,
+             score_matrix, open_penalty, extend_penalty, alignment_out_name):
+    o_path = Path(out_dir).expanduser().absolute()
+    o_path.mkdir(exist_ok=True, parents=True)
+    q_path = Path(query).expanduser().absolute()
+    NcbipsiblastCommandline(
+        query=q_path, db=blastdb, num_iterations=num_iterations, num_threads=num_threads,
+        out_ascii_pssm=o_path/(q_path.stem+'.mtx'), save_pssm_after_last_round=True)()
+    t_path = Path(template).expanduser().absolute()
+    NcbipsiblastCommandline(
+        query=t_path, db=blastdb, num_iterations=num_iterations, num_threads=num_threads,
+        out_ascii_pssm=o_path/(t_path.stem+'.mtx'), save_pssm_after_last_round=True)()
+
+    machina.predict.predict_scores(
+        o_path/(q_path.stem+'.mtx'), o_path/(t_path.stem+'.mtx'),
+        flann_x=Path(flann_x), flann_y=Path(flann_y), flann_index=Path(flann_index),
+        num_neighbors=num_neighbors, out_dir=o_path, out_name=Path(score_out_name))
+
+    machina.generate_alignment.alignment_local_and_save(
+        o_path/score_matrix, o_path/(q_path.stem+'.mtx'), o_path/(t_path.stem+'.mtx'),
+        -open_penalty, -extend_penalty, o_path, Path(alignment_out_name))
+
+
 if __name__ == '__main__':
     main()

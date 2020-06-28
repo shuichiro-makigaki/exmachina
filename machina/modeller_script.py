@@ -23,19 +23,19 @@ def main():
     auto = automodel(env, alnfile=pir_path, knowns=[template_id], sequence=query_id)
     auto.make()
 
-    # for f in glob.glob(query_id + ".V*"):
-    #     os.remove(f)
-    # for f in glob.glob(query_id + ".D*"):
-    #     os.remove(f)
-    # for f in glob.glob(query_id + ".ini"):
-    #     os.remove(f)
-    # for f in glob.glob(query_id + ".rsr"):
-    #     os.remove(f)
-    # for f in glob.glob(query_id + ".sch"):
-    #     os.remove(f)
-    # for f in glob.glob(query_id + ".B*.pdb"):
-    #     shutil.copy(f, os.path.dirname(pir_path) + '/' + query_id + '.pdb')
-    #     os.remove(f)
+    for f in glob.glob(query_id + ".V*"):
+        os.remove(f)
+    for f in glob.glob(query_id + ".D*"):
+        os.remove(f)
+    for f in glob.glob(query_id + ".ini"):
+        os.remove(f)
+    for f in glob.glob(query_id + ".rsr"):
+        os.remove(f)
+    for f in glob.glob(query_id + ".sch"):
+        os.remove(f)
+    for f in glob.glob(query_id + ".B*.pdb"):
+        shutil.copy(f, os.path.dirname(pir_path) + '/' + query_id + '.pdb')
+        os.remove(f)
     for f in glob.glob(os.path.splitext(__file__)[0] + '.log'):
         shutil.copy(f, os.path.curdir + '/modeller.log')
         os.remove(f)

@@ -16,9 +16,14 @@ import numpy as np
 from tqdm import tqdm
 
 
-# ToDo: Support PDB chains
-def replace_missing_residues(template_alignment, pdb):
-    template_pdb = str(SeqIO.read(pdb, 'pdb-atom').seq).replace('X', '')
+def replace_missing_residues(template_alignment, template_id, chain, pdb):
+    template_pdb = [str(_.seq) for _ in SeqIO.parse(pdb, 'pdb-atom') if _.id == f'{template_id}:{chain}']
+    try:
+        template_pdb = template_pdb[0].replace('X', '')
+    except IndexError:
+        print(template_id)
+        print(chain)
+
     aligner = Align.PairwiseAligner()
     aligner.mode = 'global'
     alignment = next(aligner.align(template_alignment.replace('-', ''), template_pdb))
@@ -54,23 +59,25 @@ class MachinaModel:
     def __init__(self, mod_bin):
         self.mod_bin = mod_bin
 
-    def generate_protein_model(self, query: Path, template: Path, chain: str,
-                               alignments_list: Path, template_dir: Path, out_dir: Path):
+    def generate_protein_model(self, query_id: str, template_id: str, chain: str,
+                               alignments_list: Path, template_file: Path, out_dir: Path):
         aln = np.load(alignments_list)
         best = aln[np.argmax([float(_[2]) for _ in aln])]
         pir_file = out_dir/'alignment.pir'
-        tseq = replace_missing_residues(best[1], f'{template_dir}/{template.stem}.ent')
+        tseq = replace_missing_residues(best[1], template_id, chain, template_file.as_posix())
         Path(out_dir).mkdir(parents=True, exist_ok=True)
         SeqIO.write([
-            SeqRecord(Seq(best[0], generic_protein), id=query.stem, name='',
-                      description=f'sequence:{query.stem}::::::::'),
+            SeqRecord(Seq(best[0], generic_protein), id=query_id, name='',
+                      description=f'sequence:{query_id}::::::::'),
             SeqRecord(
-                Seq(tseq, generic_protein), id=template.stem, name='',
-                description=f'structureX:{template.stem}::{chain}::{chain}::::')
+                Seq(tseq, generic_protein), id=template_id, name='',
+                description=f'structureX:{template_id}::{chain}::{chain}::::')
         ], pir_file, 'pir')
         arg = [self.mod_bin, Path(__file__).parent.resolve()/'modeller_script.py',
-               pir_file.resolve(), query.stem, template.stem, template_dir.resolve()]
-        subprocess.run(arg, stdout=subprocess.PIPE, stderr=subprocess.PIPE, universal_newlines=True, cwd=out_dir)
+               pir_file.resolve(), query_id, template_id, template_file.parent.resolve()]
+        res = subprocess.run(arg, stdout=subprocess.PIPE, stderr=subprocess.PIPE, universal_newlines=True, cwd=out_dir)
+        print(res.stdout)
+        print(res.stderr)
 
 
 class BLASTModel:
