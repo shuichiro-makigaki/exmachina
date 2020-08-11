@@ -105,3 +105,4 @@ venv.bak/
 /.pytest_cache
 /results
 /data
+/CASP14
