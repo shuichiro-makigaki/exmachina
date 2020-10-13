@@ -199,6 +199,22 @@ def predict_by_flann(x_path: Path, y_path: Path, model_path: Path, num_neighbors
     np.save(out_path.as_posix(), proba)
 
 
+def predict_by_flann_batch(x, y, model, num_neighbors: int, out_path: Path, query: Path, template: Path):
+    pssm1 = parse_pssm(query)
+    pssm2 = parse_pssm(template)
+    samples = _get_test_vector_set(pssm1, pssm2, x.shape[1]).astype(np.int32)
+    result, _ = model.nn_index(samples, num_neighbors=num_neighbors)
+    proba = np.full((len(pssm1.pssm), len(pssm2.pssm)), -1.0)
+    i = 0
+    for x1, x2 in itertools.product(range(len(pssm1.pssm)), range(len(pssm2.pssm))):
+        if x1 > int(len(pssm1.pssm) * LENGTH_RATIO) + x2 or x2 > int(len(pssm2.pssm) * LENGTH_RATIO) + x1:
+            continue
+        proba[x1, x2] = np.count_nonzero(y[result[i]]) / num_neighbors
+        i += 1
+    out_path.parent.mkdir(exist_ok=True, parents=True)
+    np.save(out_path.as_posix(), proba)
+
+
 def predict_scores(query: Path, template: Path,
                    flann_x=Path('scop40_logscore_tmscore0.5_window5_ratio0.1_x.npy'),
                    flann_y=Path('scop40_logscore_tmscore0.5_window5_ratio0.1_y.npy'),
@@ -212,4 +228,18 @@ def predict_scores(query: Path, template: Path,
         logging.warning('Do nothing')
     else:
         predict_by_flann(flann_x, flann_y, flann_index, num_neighbors, out_path, query, template)
+        logging.info(f'Result is saved into: {out_path}')
+
+
+def predict_scores_batch(query: Path, template: Path,
+                         x, y, model,
+                         num_neighbors=1000,
+                         out_dir=Path('results'),
+                         out_name=Path('score.npy')):
+    out_path = out_dir / out_name
+    if out_path.exists():
+        logging.warning(f'Result already exists: {out_path}')
+        logging.warning('Do nothing')
+    else:
+        predict_by_flann_batch(x, y, model, num_neighbors, out_path, query, template)
         logging.info(f'Result is saved into: {out_path}')
