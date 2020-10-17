@@ -52,6 +52,14 @@ def alignment_local(score_matrix_path: Path, domain_sid1: Path, domain_sid2: Pat
     return (domain_sid1.stem, domain_sid2.stem), ali
 
 
+def alignment_local2(matrix, domain_sid1: Path, domain_sid2: Path, gap_open: float, gap_extend: float):
+    seq_a = str(_pp(domain_sid1.as_posix()))
+    seq_b = str(_pp(domain_sid2.as_posix()))
+    assert len(seq_a) == matrix.shape[0] and len(seq_b) == matrix.shape[1]
+    ali = align.localcs(seq_a, seq_b, _my_match(matrix.tolist()), gap_open, gap_extend, force_generic=True)
+    return (domain_sid1.stem, domain_sid2.stem), ali
+
+
 def alignment_local_and_save(score_matrix_path: Path, domain_sid1: Path, domain_sid2: Path,
                              gap_open: float, gap_extend: float, out_dir: Path, out_name: Path):
     _, ali = alignment_local(score_matrix_path, domain_sid1, domain_sid2, gap_open, gap_extend)
