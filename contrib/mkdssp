@@ -1,0 +1,3 @@
+#! /bin/bash
+
+docker container run --volume $HOME/machina/data:/app/data:ro dssp ./mkdssp $@
