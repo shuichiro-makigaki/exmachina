@@ -36,10 +36,10 @@ Open and read `example.ipynb`.
 
 ### Build from source
 
-Install requirements:
+Install requirements (use `--user` for non-root installation):
 
 ```shell script
-pip3 install -r requirements.txt
+pip3 install [--user] -r requirements.txt
 ```
 
 We also need FLANN [1] and Python binding.
@@ -52,7 +52,7 @@ cd flann
 # git checkout 033b05b1 -b clang
 mkdir build
 cd build
-### PYTHON_EXECUTABLE:FILEPATH and CMAKE_INSTALL_PREFIX should follow your environment.
+### Environment variables `PYTHON_EXECUTABLE:FILEPATH` and `CMAKE_INSTALL_PREFIX` should follow your environment.
 ### liblz4 is required.
 cmake -DCMAKE_INSTALL_PREFIX=~/.local -DPYTHON_EXECUTABLE:FILEPATH=$(which python3) ..
 make
